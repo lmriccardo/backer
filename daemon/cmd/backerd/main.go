@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -10,13 +11,26 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/lmriccardo/backer/deamon/internal/core"
 	"github.com/lmriccardo/backer/deamon/internal/httpapi"
 	"github.com/lmriccardo/backer/deamon/internal/transport"
+	"github.com/lmriccardo/backer/deamon/internal/version"
 )
 
 func main() {
+	fmt.Println((version.Get()).String())
+
+	// Create the interrupt context
+	ctx, stop := signal.NotifyContext(
+		context.Background(),
+		os.Interrupt,
+		syscall.SIGTERM,
+	)
+
+	defer stop()
+
 	// First create the route engine for the REST API
-	engine := httpapi.NewEngine()
+	engine := httpapi.NewEngine(core.NewService(ctx))
 
 	// Then create the server listener based on the current OS
 	t, err := transport.NewTransport()
@@ -39,14 +53,6 @@ func main() {
 		}
 		serverErr <- nil
 	}()
-
-	ctx, stop := signal.NotifyContext(
-		context.Background(),
-		os.Interrupt,
-		syscall.SIGTERM,
-	)
-
-	defer stop()
 
 	// Wait either for the Interrupt signal or any
 	// server error. For server errors raise a fatal

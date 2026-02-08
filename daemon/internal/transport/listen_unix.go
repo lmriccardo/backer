@@ -7,14 +7,14 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/lmriccardo/backer/deamon/internal/core"
+	"github.com/lmriccardo/backer/deamon/internal/constants"
 )
 
 func getUnixSockPath() string {
 	if dir := os.Getenv("XDG_RUNTIME_DIR"); dir != "" {
-		return filepath.Join(dir, core.UNIX_SOCK_NAME)
+		return filepath.Join(dir, constants.UNIX_SOCK_NAME)
 	}
-	return filepath.Join(os.TempDir(), core.UNIX_SOCK_NAME)
+	return filepath.Join(os.TempDir(), constants.UNIX_SOCK_NAME)
 }
 
 func listen() (net.Listener, string, TransportType, error) {

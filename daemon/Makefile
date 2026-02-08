@@ -17,6 +17,17 @@ endif
 GOFILES := $(shell find . -name '*.go' -not -path './vendor/*')
 BIN 	:= $(BUILD)/$(APP_NAME)$(EXE)
 
+MODULE 		:= $(shell go list -m)
+VERSION 	:= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+COMMIT 		:= $(shell git rev-parse --short HEAD 2>/dev/null || echo none)
+DATE 		:= $(shell date -u +%Y-%m-%d)
+GOVERSION 	:= $(shell go env GOVERSION)
+
+LDFLAGS := -X '$(MODULE)/internal/version.Version=$(VERSION)' \
+           -X '$(MODULE)/internal/version.Commit=$(COMMIT)' \
+           -X '$(MODULE)/internal/version.Date=$(DATE)' \
+           -X '$(MODULE)/internal/version.GoVersion=$(GOVERSION)'
+
 .PHONY: build run clean fmt lint test tidy dev help
 
 help:
@@ -40,7 +51,8 @@ lint:
 build: $(BIN)
 
 $(BIN): $(GOFILES) go.mod go.sum
-	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -o $(BIN) $(CMD_FOLDER)/$(APP_NAME)
+	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -trimpath \
+		-ldflags "$(LDFLAGS)" -o $(BIN) $(CMD_FOLDER)/$(APP_NAME)
 
 run: build
 	./$(BIN)
