@@ -2,3 +2,7 @@
 **/bin/*
 **/__pycache__/*
 **/venv/*
+**/*.egg-info/
+*.code-workspace
+.env
+**/.pytest_cache/

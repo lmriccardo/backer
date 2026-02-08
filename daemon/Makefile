@@ -1,7 +1,21 @@
 APP_NAME 		:= backerd
-BIN_FOLDER 		:= build
+BUILD 			:= ../build
 CMD_FOLDER		:= ./cmd
 .DEFAULT_GOAL 	:= help
+
+# Default target OS/ARCH (can override with "make GOOS=windows")
+GOOS ?= linux
+GOARCH ?= amd64
+
+# Add .exe suffix on Windows
+ifeq ($(GOOS),windows)
+    EXE=.exe
+else
+    EXE=
+endif
+
+GOFILES := $(shell find . -name '*.go' -not -path './vendor/*')
+BIN 	:= $(BUILD)/$(APP_NAME)$(EXE)
 
 .PHONY: build run clean fmt lint test tidy dev help
 
@@ -23,14 +37,16 @@ lint:
 	@command -v golangci-lint >/dev/null || (echo "golangci-lint not installed" && exit 1)
 	golangci-lint run ./...
 
-build:
-	go build -o $(BIN_FOLDER)/$(APP_NAME) $(CMD_FOLDER)/$(APP_NAME)
+build: $(BIN)
+
+$(BIN): $(GOFILES) go.mod go.sum
+	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -o $(BIN) $(CMD_FOLDER)/$(APP_NAME)
 
 run: build
-	./$(BIN_FOLDER)/$(APP_NAME)
+	./$(BIN)
 
 clean:
-	rm -f ./$(BIN_FOLDER)/$(APP_NAME)
+	rm -f ./$(BIN)
 
 test:
 	go test ./...
