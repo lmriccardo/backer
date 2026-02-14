@@ -2,33 +2,48 @@ package core
 
 import (
 	"context"
-	"log"
+
+	"github.com/lmriccardo/backer/deamon/internal/core/ilock"
 )
 
 type Service struct {
-	HomeDir  string    // The home folder of backerd
-	LogDir   string    // Default log folder
-	Registry IRegistry // Pointer to a generic registry interface
+	IRegistry // Embed the actual registry
 
-	ctrlcCtx context.Context // Interrupt context
+	HomeDir string // The home folder of backerd
+	LogDir  string // Default log folder
+
+	ctx  context.Context // Interrupt context
+	lock *ilock.InstanceLock
 }
 
-func NewService(ctx context.Context) *Service {
-	service := &Service{ctrlcCtx: ctx}
+func NewService(ctx context.Context) (*Service, error) {
+	var err error
+
+	instance_lock, err := ilock.NewInstanceLock(ilock.LOCK_NAME)
+	if err != nil {
+		return nil, err
+	}
+
+	service := &Service{ctx: ctx, lock: instance_lock}
 
 	// Initialize the service with paths
-	var err error
 	if service.HomeDir, err = BackerHome(); err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
+
 	if service.LogDir, err = BackerLogHome(); err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
 	// Initialize the registry
-	if service.Registry, err = NewRegistry(ctx); err != nil {
-		log.Fatal(err)
+	if service.IRegistry, err = NewRegistry(ctx); err != nil {
+		return nil, err
 	}
 
-	return service
+	return service, nil
+}
+
+func (s *Service) Close() {
+	s.IRegistry.Close() // Close the registry
+	s.lock.Close()      // Release the lock
 }

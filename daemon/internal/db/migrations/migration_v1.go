@@ -9,12 +9,12 @@ import (
 func migrationV1(ctx context.Context, tx *sql.Tx) error {
 	_, err := tx.ExecContext(ctx, `
 		CREATE TABLE jobs (
-			id TEXT PRIMARY KEY,
-			name TEXT NOT NULL,
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			name TEXT NOT NULL UNIQUE,
 			enabled INTEGER NOT NULL CHECK (enabled IN (0,1)),
 			config_json TEXT NOT NULL,
-			created_at TEXT NOT NULL,
-			updated_at TEXT NOT NULL
+			created_at TEXT NOT NULL DEFAULT (datetime('now')),
+			updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 		);
 
 		CREATE INDEX idx_jobs_enabled ON jobs(enabled);

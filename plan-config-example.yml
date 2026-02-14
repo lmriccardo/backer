@@ -1,0 +1,214 @@
+# yaml-language-server: $schema=./schemas/backup-config.schema.json
+
+backup:
+  # Folder where the excludes file are saved into
+  # [REQUIRED]
+  exclude_output: /path/to/exclude-file
+
+  # Starts of the backup plans (the key is the identifier)
+  targets:
+    full_backup:
+      # Configuration of the remote server
+      # [REQUIRED]
+      remote:
+        # Put the server hostname/IPv4 address here
+        # [REQUIRED]
+        host: host.domain
+
+        # Remote rsync server port. 873 is the default port
+        # [OPTIONAL]
+        port: 1234 
+
+        # The username to connect with 
+        # [OPTIONAL]
+        user: admin
+
+        # The password file for non-interactive mode. It is not
+        # strictly required, since the remote rsync service might
+        # not need the authentication step, however, if a password
+        # is required for the specified username (if any), then it
+        # is advisable to use the password_file otherwise interactive
+        # mode is enabled and automatic backup wont work as expected.
+        # [OPTIONAL, sligthly REQUIRED]
+        password_file: /path/to/password-file
+
+        # Describes the destination of the backup in the form
+        # of <module>/<folder> as required by rsync
+        # [REQUIRED]
+        dest:
+          module: module_name # The module name [REQUIRED]
+          folder: dst_folder # Destination folder under the module [REQUIRED]
+      
+      # RSync Configuration for the backup plan
+      # [REUQUIRED]
+      rsync:
+        # Folder where the expanded excludes are saved into.
+        # Overwrites the global exclude_output variable.
+        # [OPTIONAL]
+        exclude_output_folder: /path/to/exclude/output
+
+        # Base file with a bunch of paths to exclude
+        # [CAN BE OMITTED]
+        exclude_from: /path/to/base-exclude-file
+
+        # Put additional folders/files here (absolute path)
+        # [IS A LIST OF PATHS, CAN BE OMITTED]
+        excludes:
+          - /prova-exclude/*
+        # - additional paths here
+        
+        # Includes removes paths from the exclusion if they exists.
+        # It can be useful in case one would like to have a general
+        # excludes starting file and then simply modify the base file
+        # to generate the final exclude plan file.
+        # If specific files/folders do not exists they are appended
+        # to the rsync command in the "source" part
+        # 
+        # [IS A LIST OF PATHS, CAN BE OMITTED]
+        includes:
+          - /prova-includes/*
+        # - additional paths here
+
+        # The sources to copy into the remote
+        # [IT IS A LIST OF PATHS, REQUIRED]
+        sources:
+          - '/path/to/source-folder-1'
+          - '/path/to/source-folder-2'
+        # - additional paths here
+
+        # Additional options to pass to the rsync command
+        # [OPTIONAL]
+        options:
+          # Enable/Disable verbosity
+          # [CAN BE OMITTED]
+          verbose: true # or false
+
+          # Shows the progress
+          # [CAN BE OMITTED]
+          show_progres: true # or false
+
+          # Enable or disable compression before transmitting
+          # [CAN BE OMITTED]
+          compress: true # or false
+
+          # Enable/Disable delete mode. In the case it is enabled
+          # a mode must be provided, different modes are: 
+          # before, after, during, delay and finally excluded
+          # [OPTIONAL, default=delete-after]
+          delete: after
+
+          # Output a change-summary for all updates
+          # [OPTIONAL, default=false]
+          itemize_changes: true # or false
+
+          # Keep specials files likes UNIX sockets or FIFOs.
+          # To enable this option you shall check that the target 
+          # filesystem support this kind of files
+          # [OPTIONAL, default=false]
+          keep_specials: false # or true
+
+          # Keep devices file (`/dev/null`, `/dev/sda`, ...)
+          # To enable this option you shall check that the target 
+          # filesystem support this kind of files
+          # [OPTIONAL, default=false]
+          keep_devices: false # or true
+
+      # Describes the backup frequency as a cronjob.
+      # null are converted into * wildcards
+      # Setting every field to null means * * * * * in cron string
+      # [REQUIRED]
+      schedule:
+        weekday: null # Range 0-7 (Sun = 0 or 7)
+        month: null # Range 1-12
+        day: null # Day of the month Range 1-31
+        hour: null # Range 0-23
+        minute: null # Range 0-59
+
+      # Sets the notification system, i.e., the way in which the user 
+      # is notified about the backup. Up to now, only the email system 
+      # is active. All notification systems are used at once.
+      # [OPTIONAL]
+      notification:
+        # Using the email notification system. If the SMTP can be inferred
+        # from the email domain than the SMTP section is not required,
+        # otherwise it is required and if not present an error occurs.
+        # Currently known domains are: gmail, outlook, yahoo and icloud
+        # [OPTIONAL]
+        email:
+          # The email of the sender
+          # [REQUIRED]
+          from: user.email@domain.com
+          # A list of recipients for the notification email.
+          # [REQUIRED AT LEAST 1]
+          to:
+            - dstuser.email@domain.com
+          # - additional recipients here
+
+          # The account password used to authentication to the SMTP server
+          # [REQUIRED]
+          password: account_password_here
+
+          # SMTP configuration if a custom email server is provided
+          # or an uknown domain is detected
+          # [OPTIONAL]
+          smtp:
+            server: host.domain # The SMTP server host [REQUIRED]
+            port: 1234 # The SMTP Server remote port [REQUIRED]
+
+            # Tell if the SMTP server has SSL enabled or not. Notice that
+            # the server must at least has TLS enabled otherwise this
+            # method of notification will be ignored
+            # [OPTIONAL, default=False]
+            ssl: false # or true
+
+        # Webhooks notifications. It is a list of notification setting.
+        # Each of them must defines the end-point, on which events
+        # to configure the notification, the timeout for retrying
+        # and additional (optional) authorization methods.
+        #
+        # Active possible endpoints are: Discord.
+        #
+        # [OPTIONAL]
+        webhooks:
+            # Here is the the name of the service. There can be duplicated
+            # services ( at the end each of them is assigned to a unique id )
+            # [REQUIRED, string]
+          - name: discord-on-failure
+            # The type of the webhook service endpoint. There is a
+            # limited set of available endpoints.
+            # [REQUIRED]
+            type: discord
+            # The endpoint URL of the service
+            # [REQUIRED]
+            url: https://discord.com/api/webhooks/...
+            # Subscribed Events: failure, success
+            # [OPTIONAL, default=all events]
+            events: [ failure ]
+            # Timeout for receiving the response after sending the notification.
+            # Value can be expressed in seconds (s), milliseconds (ms)
+            # and microseconds (us).
+            # [OPTIONAL, default=no timeout, wait until response arrive]
+            timeout: 5s
+            # Maximum number of retries
+            # [OPTIONAL, default=0]
+            max_retries: 2
+            # Additional headers used for the requests, such 
+            # as Authentication and Authorization tokens
+            # [OPTIONAL, default=null]
+            headers: null
+              # Authorization: Bearer ${WEBHOOK_TOKEN}
+
+          # - additional webhooks endpoints 
+      
+      # Log retention policy overwriting for the current target. It is not required 
+      # and by default log files are kept spare up to a maximum of 10 files. Once the
+      # cap has hit, 10 latest recently produced logs are compressed into a zip 
+      # archive and after 1 week removed.
+      # [ OPTIONAL ]
+      log_retention:
+        # Maximum number of spare log files
+        # [ REQUIRED, default=10 ]
+        max_spare_files: 10
+        # Retention window in days for compressed batch of files.
+        # [ REQUIRED, default=7 ]
+        retention_window: 7 # in days

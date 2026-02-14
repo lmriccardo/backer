@@ -1,0 +1,43 @@
+{
+  "name": "backup",
+  "log": "/path/to/log_folder",
+  "compression": false,
+  "command": [
+    "rsync",
+    "-avvHAX",
+    "--delete",
+    "--delete-after",
+    "--password-file=/path/to/.rsync_pass",
+    "--info=progress2",
+    "--prune-empty-dirs",
+    "--exclude-from=/path/to/exclude-file",
+    "--numeric-ids",
+    "SRC",
+    "rsync://user@remote-host:873/DST"
+  ],
+  "notification": [
+    {
+      "id": 1,
+      "type": "email",
+      "from": "user.email@domain",
+      "to": [
+        "receiver1.email@domain"
+      ],
+      "password": "user-password",
+      "server": "stmp-server.domain",
+      "port": 587,
+      "ssl": true
+    },
+    {
+      "id": 2,
+      "type" : "webhook",
+      "webhook_type": "discord",
+      "name": "discord-on-failure",
+      "url": "https://endpoint/api/webhook",
+      "events": [ "failure" ],
+      "timeout": 12.3,
+      "headers": null,
+      "max_retries": 2
+    }
+  ]
+}

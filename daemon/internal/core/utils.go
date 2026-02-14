@@ -51,3 +51,9 @@ func RegistryFile() (string, error) {
 	}
 	return filepath.Join(home, "registry.db"), nil
 }
+
+// Exist checks if a file exists in the current machine
+func Exist(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}

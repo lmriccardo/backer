@@ -61,7 +61,7 @@ clean:
 	rm -f ./$(BIN)
 
 test:
-	go test ./...
+	go test -v ./test/...
 
 tidy:
 	go mod tidy

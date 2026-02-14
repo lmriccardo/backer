@@ -6,18 +6,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/lmriccardo/backer/deamon/internal/db/migrations"
 	_ "modernc.org/sqlite"
 )
-
-func AcquireInstanceLock(ctx context.Context, db *sql.DB) error {
-	// WAL + single-writer is fine, but this prevents "two schedulers" bugs.
-	// This lock is held as long as the connection remains open.
-	_, err := db.ExecContext(ctx, `BEGIN IMMEDIATE;`)
-	if err != nil {
-		return fmt.Errorf("cannot acquire instance lock (another backerd running?): %w", err)
-	}
-	return nil
-}
 
 func OpenDB(path string) (*sql.DB, error) {
 	db, err := sql.Open("sqlite", path)
@@ -41,8 +32,8 @@ func OpenDB(path string) (*sql.DB, error) {
 	pragmas := []string{
 		`PRAGMA journal_mode = WAL;`,
 		`PRAGMA foreign_keys = ON;`,
-		`PRAGMA busy_timeout = 5000;`,  // ms: wait for locks instead of failing fast
-		`PRAGMA synchronous = NORMAL;`, // good durability/perf tradeoff with WAL
+		`PRAGMA busy_timeout = 5000;`,
+		`PRAGMA synchronous = NORMAL;`,
 	}
 
 	for _, p := range pragmas {
@@ -53,4 +44,22 @@ func OpenDB(path string) (*sql.DB, error) {
 	}
 
 	return db, nil
+}
+
+func LoadFromPath(path string) (*sql.DB, error) {
+	// 1. Open the database from the file path
+	d, err := OpenDB(path)
+	if err != nil {
+		return nil, err
+	}
+
+	// 2. Apply migrations if necessary
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := migrations.EnsureSchema(ctx, d); err != nil {
+		return nil, err
+	}
+
+	return d, nil
 }

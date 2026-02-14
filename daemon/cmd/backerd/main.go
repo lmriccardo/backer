@@ -30,7 +30,12 @@ func main() {
 	defer stop()
 
 	// First create the route engine for the REST API
-	engine := httpapi.NewEngine(core.NewService(ctx))
+	service, err := core.NewService(ctx)
+	if err != nil {
+		log.Fatalf("when creating the service: %v", err)
+	}
+
+	engine := httpapi.NewEngine(service)
 
 	// Then create the server listener based on the current OS
 	t, err := transport.NewTransport()
@@ -74,7 +79,8 @@ func main() {
 	defer cancel()
 
 	_ = srv.Shutdown(sdwnCtx) // stops HTTP, drains requests
-	t.Close()                 // your cleanup (listener close + unlink etc.)
+	t.Close()                 // cleanup (listener close + unlink etc.)
+	service.Close()           // Cleanup the service
 
 	// Wait for Serve goroutine to finish before exiting main
 	if err := <-serverErr; err != nil {

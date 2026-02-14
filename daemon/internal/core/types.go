@@ -26,6 +26,13 @@ const (
 	WebhookDiscord Webhook = "discord"
 )
 
+type EventType string
+
+const (
+	EventFailure EventType = "failure"
+	EventSuccess EventType = "success"
+)
+
 type Notification interface {
 	Kind() string // Returns the notification system type
 }
@@ -55,17 +62,29 @@ func (e *EmailNotification) Kind() string { return "email" }
 
 type WebhookNotification struct {
 	ID          int               `json:"id"`
-	Type        string            `json:"type"`         // "webhook"
+	Type        NotificationType  `json:"type"`         // "webhook"
 	WebhookType Webhook           `json:"webhook_type"` // "discord"
 	Name        string            `json:"name"`
 	URL         string            `json:"url"`
-	Events      []string          `json:"events"`
+	Events      []EventType       `json:"events"`
 	Timeout     float64           `json:"timeout"`
 	Headers     map[string]string `json:"headers"` // null -> nil is fine
 	MaxRetries  int               `json:"max_retries"`
 }
 
 func (w *WebhookNotification) Kind() string { return "webhook" }
+
+// GetObject returns the email object associated with the notification ty
+func (t *NotificationType) GetObject() (Notification, error) {
+	switch *t {
+	case EmailNotify:
+		return &EmailNotification{}, nil
+	case WebhookNotify:
+		return &WebhookNotification{}, nil
+	default:
+		return nil, fmt.Errorf("unknown notification type %q", *t)
+	}
+}
 
 // UnmarshalJSON Helper to unmarshal polymorphic type Notification
 // in the Job configuration JSON. By implementing this method
@@ -96,15 +115,10 @@ func (l *NotificationList) UnmarshalJSON(data []byte) error {
 			return fmt.Errorf("notification missing required field 'type'")
 		}
 
-		var e Notification
-
-		switch NotificationType(peek.Type) {
-		case EmailNotify:
-			e = &EmailNotification{}
-		case WebhookNotify:
-			e = &WebhookNotification{}
-		default:
-			return fmt.Errorf("unknown notification type %q", peek.Type)
+		t := NotificationType(peek.Type)
+		e, err := t.GetObject()
+		if err != nil {
+			return err
 		}
 
 		if err := json.Unmarshal(item, e); err != nil {
@@ -118,9 +132,23 @@ func (l *NotificationList) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// ToJson unmarshal the input string into the generic Type.
+// If the type is not marshable, or json encodable then it
+// returns an error.
+func ToJson[T any](jsonStr string) (T, error) {
+	var object T // Create the object of type T
+	err := json.Unmarshal([]byte(jsonStr), &object)
+	return object, err
+}
+
+func ToJsonWithObj[T any](dst *T, jsonStr string) error {
+	err := json.Unmarshal([]byte(jsonStr), dst)
+	return err
+}
+
 // This struct identify a single job.
 type Job struct {
-	Id     string    // The unique identifier of the job
+	Id     int       // The unique identifier of the job
 	Name   string    // The name of the job (unique as well)
 	Status JobStatus // The status of the current job (enabled/disabled)
 	Config JobConfig // Job configuration
