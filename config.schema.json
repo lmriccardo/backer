@@ -1,0 +1,575 @@
+{
+  "$defs": {
+    "BackupCfg": {
+      "properties": {
+        "exclude_output": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Exclude Output"
+        },
+        "targets": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "$ref": "#/$defs/Target"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Targets"
+        }
+      },
+      "title": "BackupCfg",
+      "type": "object"
+    },
+    "DeleteType": {
+      "enum": [
+        "after",
+        "before",
+        "delay",
+        "during",
+        "excluded"
+      ],
+      "title": "DeleteType",
+      "type": "string"
+    },
+    "EmailCfg": {
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "format": "email",
+          "title": "From",
+          "type": "string"
+        },
+        "to": {
+          "items": {
+            "format": "email",
+            "type": "string"
+          },
+          "title": "To",
+          "type": "array"
+        },
+        "password": {
+          "title": "Password",
+          "type": "string"
+        },
+        "smtp": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SMTP_Cfg"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "from",
+        "to",
+        "password"
+      ],
+      "title": "EmailCfg",
+      "type": "object"
+    },
+    "EventType": {
+      "enum": [
+        "success",
+        "failure"
+      ],
+      "title": "EventType",
+      "type": "string"
+    },
+    "LogRetentionCfg": {
+      "properties": {
+        "max_spare_files": {
+          "minimum": 1,
+          "title": "Max Spare Files",
+          "type": "integer"
+        },
+        "retention_window": {
+          "minimum": 1,
+          "title": "Retention Window",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "max_spare_files",
+        "retention_window"
+      ],
+      "title": "LogRetentionCfg",
+      "type": "object"
+    },
+    "NotifType": {
+      "enum": [
+        "discord"
+      ],
+      "title": "NotifType",
+      "type": "string"
+    },
+    "NotificationCfg": {
+      "properties": {
+        "email": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EmailCfg"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "webhooks": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/WebhookCfg"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Webhooks"
+        }
+      },
+      "title": "NotificationCfg",
+      "type": "object"
+    },
+    "Remote": {
+      "properties": {
+        "host": {
+          "title": "Host",
+          "type": "string"
+        },
+        "port": {
+          "default": 873,
+          "maximum": 65535,
+          "minimum": 1,
+          "title": "Port",
+          "type": "integer"
+        },
+        "user": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "User"
+        },
+        "password_file": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Password File"
+        },
+        "dest": {
+          "$ref": "#/$defs/RemoteDest"
+        }
+      },
+      "required": [
+        "host",
+        "dest"
+      ],
+      "title": "Remote",
+      "type": "object"
+    },
+    "RemoteDest": {
+      "properties": {
+        "module": {
+          "title": "Module",
+          "type": "string"
+        },
+        "folder": {
+          "title": "Folder",
+          "type": "string"
+        }
+      },
+      "required": [
+        "module",
+        "folder"
+      ],
+      "title": "RemoteDest",
+      "type": "object"
+    },
+    "RsyncCfg": {
+      "additionalProperties": false,
+      "properties": {
+        "exclude_output_folder": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Exclude Output Folder"
+        },
+        "exclude_from": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Exclude From"
+        },
+        "excludes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Excludes",
+          "type": "array"
+        },
+        "includes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Includes",
+          "type": "array"
+        },
+        "sources": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Sources",
+          "type": "array"
+        },
+        "options": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RsyncOptions"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "RsyncCfg",
+      "type": "object"
+    },
+    "RsyncOptions": {
+      "properties": {
+        "compress": {
+          "default": false,
+          "title": "Compress",
+          "type": "boolean"
+        },
+        "verbose": {
+          "default": true,
+          "title": "Verbose",
+          "type": "boolean"
+        },
+        "show_progress": {
+          "default": true,
+          "title": "Show Progress",
+          "type": "boolean"
+        },
+        "itemize_changes": {
+          "default": false,
+          "title": "Itemize Changes",
+          "type": "boolean"
+        },
+        "delete": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DeleteType"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "keep_specials": {
+          "default": false,
+          "title": "Keep Specials",
+          "type": "boolean"
+        },
+        "keep_devices": {
+          "default": false,
+          "title": "Keep Devices",
+          "type": "boolean"
+        }
+      },
+      "title": "RsyncOptions",
+      "type": "object"
+    },
+    "SMTP_Cfg": {
+      "properties": {
+        "server": {
+          "title": "Server",
+          "type": "string"
+        },
+        "port": {
+          "anyOf": [
+            {
+              "maximum": 65535,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Port"
+        },
+        "ssl": {
+          "default": false,
+          "title": "Ssl",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "server"
+      ],
+      "title": "SMTP_Cfg",
+      "type": "object"
+    },
+    "Schedule": {
+      "additionalProperties": false,
+      "properties": {
+        "weekday": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Weekday"
+        },
+        "month": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Month"
+        },
+        "day": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Day"
+        },
+        "hour": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Hour"
+        },
+        "minute": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Minute"
+        }
+      },
+      "title": "Schedule",
+      "type": "object"
+    },
+    "Target": {
+      "additionalProperties": false,
+      "properties": {
+        "remote": {
+          "$ref": "#/$defs/Remote"
+        },
+        "rsync": {
+          "$ref": "#/$defs/RsyncCfg"
+        },
+        "schedule": {
+          "$ref": "#/$defs/Schedule"
+        },
+        "notification": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NotificationCfg"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "log_retention": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LogRetentionCfg"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": {
+            "max_spare_files": 10,
+            "retention_window": 7
+          }
+        }
+      },
+      "required": [
+        "remote",
+        "rsync",
+        "schedule"
+      ],
+      "title": "Target",
+      "type": "object"
+    },
+    "WebhookCfg": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/NotifType"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "url": {
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "title": "Url",
+          "type": "string"
+        },
+        "events": {
+          "items": {
+            "$ref": "#/$defs/EventType"
+          },
+          "minItems": 1,
+          "title": "Events",
+          "type": "array"
+        },
+        "timeout": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Timeout"
+        },
+        "max_retries": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Retries"
+        },
+        "headers": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Headers"
+        }
+      },
+      "required": [
+        "type",
+        "name",
+        "url"
+      ],
+      "title": "WebhookCfg",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "backup": {
+      "$ref": "#/$defs/BackupCfg"
+    }
+  },
+  "required": [
+    "backup"
+  ],
+  "title": "YAML_Conf",
+  "type": "object"
+}
