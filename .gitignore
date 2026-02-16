@@ -6,3 +6,4 @@
 *.code-workspace
 .env
 **/.pytest_cache/
+example/

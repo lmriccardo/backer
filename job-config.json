@@ -1,6 +1,10 @@
 {
   "name": "backup",
-  "log": "/path/to/log_folder",
+  "log": {
+    "path": "/path/to/log_folder",
+    "max_spare_files": 10,
+    "retention_window": 7
+  },
   "compression": false,
   "command": [
     "rsync",

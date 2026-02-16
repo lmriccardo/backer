@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/lmriccardo/backer/deamon/internal/core"
+	"github.com/lmriccardo/backer/deamon/internal/core/service"
 	"github.com/lmriccardo/backer/deamon/internal/httpapi"
 	"github.com/lmriccardo/backer/deamon/internal/transport"
 	"github.com/lmriccardo/backer/deamon/internal/version"
@@ -30,7 +30,7 @@ func main() {
 	defer stop()
 
 	// First create the route engine for the REST API
-	service, err := core.NewService(ctx)
+	service, err := service.NewService(ctx)
 	if err != nil {
 		log.Fatalf("when creating the service: %v", err)
 	}

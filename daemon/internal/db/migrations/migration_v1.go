@@ -6,7 +6,7 @@ import (
 )
 
 // migrationV1 Introduces the JOBS table
-func migrationV1(ctx context.Context, tx *sql.Tx) error {
+func MigrationV1(ctx context.Context, tx *sql.Tx) error {
 	_, err := tx.ExecContext(ctx, `
 		CREATE TABLE jobs (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,

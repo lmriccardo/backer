@@ -5,7 +5,7 @@ import (
 	"database/sql"
 )
 
-func migrationV2(ctx context.Context, tx *sql.Tx) error {
+func MigrationV2(ctx context.Context, tx *sql.Tx) error {
 	_, err := tx.ExecContext(ctx, `
 		CREATE TABLE runs (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,

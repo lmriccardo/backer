@@ -1,4 +1,4 @@
-package migrations
+package db
 
 import (
 	"context"
@@ -7,12 +7,13 @@ import (
 	"log"
 
 	"github.com/lmriccardo/backer/deamon/internal/constants"
+	"github.com/lmriccardo/backer/deamon/internal/db/migrations"
 )
 
 type MigrationFunc func(context.Context, *sql.Tx) error
 
 var migration_table = map[int]MigrationFunc{
-	1: migrationV1, 2: migrationV2,
+	1: migrations.MigrationV1, 2: migrations.MigrationV2,
 }
 
 // EnsureSchema Ensures that the current registry DB is at the
@@ -96,29 +97,25 @@ func currentVersion(ctx context.Context, db *sql.DB) (int, error) {
 
 // applyMigration Applies the input migration version
 func applyMigration(ctx context.Context, db *sql.DB, version int) error {
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
+	err := WithTx(db, ctx, func(tx *sql.Tx) error {
+		// Apply the migration stored in the table
+		migration_fn, ok := migration_table[version]
+		if !ok {
+			return fmt.Errorf("unknown migration version: %d", version)
+		}
 
-	// Apply the migration stored in the table
-	migration_fn, ok := migration_table[version]
-	if !ok {
-		return fmt.Errorf("unknown migration version: %d", version)
-	}
+		log.Printf("Performing migration V%d", version)
+		if err := migration_fn(ctx, tx); err != nil {
+			return fmt.Errorf("migrate v%d: %w", version, err)
+		}
 
-	log.Printf("Performing migration V%d", version)
-	if err := migration_fn(ctx, tx); err != nil {
-		return fmt.Errorf("migrate v%d: %w", version, err)
-	}
-
-	// Finally update the schema version
-	const update_query = `UPDATE schema_version SET version = ?;`
-	_, err = tx.ExecContext(ctx, update_query, version)
-	if err != nil {
-		return fmt.Errorf("update schema_version=%d: %w", version, err)
-	}
-
-	return tx.Commit()
+		// Finally update the schema version
+		const update_query = `UPDATE schema_version SET version = ?;`
+		_, err := tx.ExecContext(ctx, update_query, version)
+		if err != nil {
+			return fmt.Errorf("update schema_version=%d: %w", version, err)
+		}
+		return nil
+	})
+	return err
 }
