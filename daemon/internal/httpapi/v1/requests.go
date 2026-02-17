@@ -59,13 +59,13 @@ const (
 
 // Rsync options for command formatting
 type RsyncOptions struct {
-	Verbose        bool       `json:"verbose"`                // Enable/Disable verbosity
-	ShowProgress   bool       `json:"show_progress"`          // Shows the progress in the log output
-	Compress       bool       `json:"compress"`               // Enable or Disable compression before trasmitting
-	Delete         DeleteType `json:"delete" example:"after"` // Delete mode one of [ before, after, during, delay and excluded ]
-	ItemizeChanges bool       `json:"itemize_changes"`        // Output a change-summary for all updates
-	KeepSpecials   bool       `json:"keep_specials"`          // Keep specials files likes UNIX sockets or FIFOs.
-	KeepDevices    bool       `json:"keep_devices"`           // Keep devices file (`/dev/null`, `/dev/sda`, ...)
+	Verbose        bool       `json:"verbose"`                                      // Enable/Disable verbosity
+	ShowProgress   bool       `json:"show_progress"`                                // Shows the progress in the log output
+	Compress       bool       `json:"compress"`                                     // Enable or Disable compression before trasmitting
+	Delete         DeleteType `json:"delete" example:"after" binding:"delete_mode"` // Delete mode one of [ before, after, during, delay and excluded ]
+	ItemizeChanges bool       `json:"itemize_changes"`                              // Output a change-summary for all updates
+	KeepSpecials   bool       `json:"keep_specials"`                                // Keep specials files likes UNIX sockets or FIFOs.
+	KeepDevices    bool       `json:"keep_devices"`                                 // Keep devices file (`/dev/null`, `/dev/sda`, ...)
 }
 
 func (r *RsyncOptions) ApplyDefault() {
@@ -85,9 +85,9 @@ type ScheduleConfig struct {
 
 // Custom SMTP server configuration
 type SMTPConfig struct {
-	Server string `json:"server" binding:"required"` // The SMTP server host
-	Port   string `json:"port"   binding:"required"` // The SMTP Server port
-	Ssl    bool   `json:"ssl"    binding:"required"` // Tell if the SMTP server has SSL enabled or not
+	Server string `json:"server" binding:"required"`                 // The SMTP server host
+	Port   uint16 `json:"port"   binding:"required,min=1,max=65535"` // The SMTP Server port
+	Ssl    bool   `json:"ssl"    binding:"required"`                 // Tell if the SMTP server has SSL enabled or not
 }
 
 // Notification system configuration
@@ -100,21 +100,21 @@ type NotificationCfg struct {
 // email domain than the SMTP section is not required, otherwise it is
 // required and if not present an error occurrs.
 type EmailNotification struct {
-	From     string      `json:"from"     binding:"required"`       // The email of the sender
-	To       []string    `json:"to"       binding:"required,min=1"` // A list of recipients for the notification email
-	Password string      `json:"password" binding:"required"`       // The account password used to authentication to the SMTP server
-	Smtp     *SMTPConfig `json:"smtp"`                              // Optional SMTP server
+	From     string      `json:"from"     binding:"required,email"`            // The email of the sender
+	To       []string    `json:"to"       binding:"required,min=1,dive,email"` // A list of recipients for the notification email
+	Password string      `json:"password" binding:"required"`                  // The account password used to authentication to the SMTP server
+	Smtp     *SMTPConfig `json:"smtp"`                                         // Optional SMTP server
 }
 
 // Webhooks notifications system
 type WebhookNotification struct {
-	Name       string            `json:"name"        binding:"required"` // The name of the service (there can be duplicates)
-	Type       core.Webhook      `json:"type"        binding:"required"` // The type of the webhook service endpoint
-	URL        string            `json:"url"         binding:"required"` // The endpoint URL of the service
-	Events     []core.EventType  `json:"events"`                         // Subscribed Events: failure, success
-	Timeout    string            `json:"timeout"`                        // Timeout for receiving the response after sending the notification.
-	MaxRetries int               `json:"max_retries" binding:"min=0"`    // Maximum number of retries
-	Headers    map[string]string `json:"headers"`                        // Additional headers used for the requests
+	Name       string            `json:"name"        binding:"required"`                  // The name of the service (there can be duplicates)
+	Type       core.Webhook      `json:"type"        binding:"required,webhook_type"`     // The type of the webhook service endpoint
+	URL        string            `json:"url"         binding:"required,http_url"`         // The endpoint URL of the service
+	Events     []core.EventType  `json:"events"      binding:"omitempty,dive,event_type"` // Subscribed Events: failure, success
+	Timeout    string            `json:"timeout"     binding:"timeout_type"`              // Timeout for receiving the response after sending the notification.
+	MaxRetries int               `json:"max_retries" binding:"min=0"`                     // Maximum number of retries
+	Headers    map[string]string `json:"headers"`                                         // Additional headers used for the requests
 }
 
 func (w *WebhookNotification) ApplyDefault() {

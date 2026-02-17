@@ -20,11 +20,18 @@ func HandleJobCreateRequest(ctx *gin.Context) {
 		return
 	}
 
+	// Validates the request payload using internal gin validator
+	if ok := ValidateRequest(req, ctx); !ok {
+		return
+	}
+
 	ctx.Status(http.StatusOK)
 }
 
 // RegisterHandlers registers v1 handlers
 func RegisterHandlers(rg *gin.RouterGroup) {
+	_ = RegisterValidators() // Registers all validators
+
 	rg.Group("/v1").Group("/jobs").
 		GET("/", HandleListJobs).
 		POST("/create", HandleJobCreateRequest)
