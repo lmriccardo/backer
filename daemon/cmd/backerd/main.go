@@ -11,10 +11,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/lmriccardo/backer/deamon/internal/core/service"
-	"github.com/lmriccardo/backer/deamon/internal/httpapi"
-	"github.com/lmriccardo/backer/deamon/internal/transport"
-	"github.com/lmriccardo/backer/deamon/internal/version"
+	httpapi "github.com/lmriccardo/backer/deamon/internal/api/http"
+	"github.com/lmriccardo/backer/deamon/internal/app/service"
+	"github.com/lmriccardo/backer/deamon/internal/infra/transport"
+	"github.com/lmriccardo/backer/deamon/internal/platform/version"
 )
 
 func main() {

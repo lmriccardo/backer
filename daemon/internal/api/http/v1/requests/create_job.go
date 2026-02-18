@@ -1,10 +1,10 @@
-package v1
+package requests
 
-import "github.com/lmriccardo/backer/deamon/internal/core"
+import "github.com/lmriccardo/backer/deamon/internal/domain"
 
 // JobCreateRequest is the body structure of the JSON data
 // for the POST http request to endpoint /jobs/create for
-// creating a new Job
+// creating a new Job.
 type CreateJobRequest struct {
 	Name         string          `json:"name" example:"full_backup" binding:"required"` // The name of the target/job
 	Remote       RemoteConfig    `json:"remote"                     binding:"required"` // The remote configuration
@@ -15,6 +15,7 @@ type CreateJobRequest struct {
 }
 
 // Configuration for the remote server
+// NOTE: tags live here to avoid duplicating API request structs.
 type RemoteConfig struct {
 	Host     string        `json:"host"     example:"host.domain"   binding:"required"`        // Server Hostname/IPv4 address
 	Port     uint16        `json:"port"     example:"1234"          binding:"min=1,max=65535"` // Remote server port
@@ -108,18 +109,18 @@ type EmailNotification struct {
 
 // Webhooks notifications system
 type WebhookNotification struct {
-	Name       string            `json:"name"        binding:"required"`                  // The name of the service (there can be duplicates)
-	Type       core.Webhook      `json:"type"        binding:"required,webhook_type"`     // The type of the webhook service endpoint
-	URL        string            `json:"url"         binding:"required,http_url"`         // The endpoint URL of the service
-	Events     []core.EventType  `json:"events"      binding:"omitempty,dive,event_type"` // Subscribed Events: failure, success
-	Timeout    string            `json:"timeout"     binding:"timeout_type"`              // Timeout for receiving the response after sending the notification.
-	MaxRetries int               `json:"max_retries" binding:"min=0"`                     // Maximum number of retries
-	Headers    map[string]string `json:"headers"`                                         // Additional headers used for the requests
+	Name       string             `json:"name"        binding:"required"`                  // The name of the service (there can be duplicates)
+	Type       domain.Webhook     `json:"type"        binding:"required,webhook_type"`     // The type of the webhook service endpoint
+	URL        string             `json:"url"         binding:"required,http_url"`         // The endpoint URL of the service
+	Events     []domain.EventType `json:"events"      binding:"omitempty,dive,event_type"` // Subscribed Events: failure, success
+	Timeout    string             `json:"timeout"     binding:"timeout_type"`              // Timeout for receiving the response after sending the notification.
+	MaxRetries int                `json:"max_retries" binding:"min=0"`                     // Maximum number of retries
+	Headers    map[string]string  `json:"headers"`                                         // Additional headers used for the requests
 }
 
 func (w *WebhookNotification) ApplyDefault() {
 	if len(w.Events) == 0 {
-		w.Events = []core.EventType{core.EventSuccess, core.EventFailure}
+		w.Events = []domain.EventType{domain.EventSuccess, domain.EventFailure}
 	}
 
 	if w.Timeout == "" {

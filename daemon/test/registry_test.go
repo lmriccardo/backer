@@ -11,9 +11,9 @@ import (
 	_ "embed"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/lmriccardo/backer/deamon/internal/core"
-	"github.com/lmriccardo/backer/deamon/internal/core/service"
-	"github.com/lmriccardo/backer/deamon/internal/utils"
+	"github.com/lmriccardo/backer/deamon/internal/app/service"
+	"github.com/lmriccardo/backer/deamon/internal/domain"
+	"github.com/lmriccardo/backer/deamon/internal/platform/utils"
 )
 
 /*
@@ -38,7 +38,7 @@ func mustNewRegistry(t *testing.T) *service.Registry {
 }
 
 func testListAllJobs(ctx context.Context, reg *service.Registry, tx *sql.Tx) error {
-	jobs, err := reg.ListJobs(ctx, core.JobStatusAll, tx)
+	jobs, err := reg.ListJobs(ctx, domain.JobStatusAll, tx)
 	if err != nil {
 		return err
 	}
@@ -51,7 +51,7 @@ func testListAllJobs(ctx context.Context, reg *service.Registry, tx *sql.Tx) err
 }
 
 func testListEnabledJobs(ctx context.Context, reg *service.Registry, tx *sql.Tx) error {
-	jobs, err := reg.ListJobs(ctx, core.JobStatusEnabled, tx)
+	jobs, err := reg.ListJobs(ctx, domain.JobStatusEnabled, tx)
 	if err != nil {
 		return err
 	}
@@ -60,13 +60,13 @@ func testListEnabledJobs(ctx context.Context, reg *service.Registry, tx *sql.Tx)
 		return fmt.Errorf("expected 1 jobs, found: %d", len(jobs))
 	}
 
-	expected := core.Job{
+	expected := domain.Job{
 		Id:     1,
 		Name:   "simple_backup",
-		Status: core.JobStatusEnabled,
-		Config: core.JobConfig{
+		Status: domain.JobStatusEnabled,
+		Config: domain.JobConfig{
 			Name:        "simple_backup",
-			Log:         core.LogConfig{Path: "/path/to/log_folder"},
+			Log:         domain.LogConfig{Path: "/path/to/log_folder"},
 			Compression: false,
 			Command:     []string{"ciao"},
 			Notify:      nil,
@@ -81,7 +81,7 @@ func testListEnabledJobs(ctx context.Context, reg *service.Registry, tx *sql.Tx)
 }
 
 func testListDisabledJobs(ctx context.Context, reg *service.Registry, tx *sql.Tx) error {
-	jobs, err := reg.ListJobs(ctx, core.JobStatusDisabled, tx)
+	jobs, err := reg.ListJobs(ctx, domain.JobStatusDisabled, tx)
 	if err != nil {
 		return err
 	}
@@ -90,13 +90,13 @@ func testListDisabledJobs(ctx context.Context, reg *service.Registry, tx *sql.Tx
 		return fmt.Errorf("expected 1 jobs, found: %d", len(jobs))
 	}
 
-	expected := core.Job{
+	expected := domain.Job{
 		Id:     2,
 		Name:   "full_backup",
-		Status: core.JobStatusDisabled,
-		Config: core.JobConfig{
+		Status: domain.JobStatusDisabled,
+		Config: domain.JobConfig{
 			Name:        "full_backup",
-			Log:         core.LogConfig{Path: "/path/to/log_folder1"},
+			Log:         domain.LogConfig{Path: "/path/to/log_folder1"},
 			Compression: true,
 			Command:     []string{"ls"},
 			Notify:      nil,

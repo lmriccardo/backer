@@ -4,13 +4,13 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/lmriccardo/backer/deamon/internal/constants"
-	"github.com/lmriccardo/backer/deamon/internal/core/service"
-	v1 "github.com/lmriccardo/backer/deamon/internal/httpapi/v1"
-	"github.com/lmriccardo/backer/deamon/internal/version"
+	"github.com/lmriccardo/backer/deamon/internal/api/http/v1"
+	"github.com/lmriccardo/backer/deamon/internal/app/service"
+	"github.com/lmriccardo/backer/deamon/internal/platform/constants"
+	"github.com/lmriccardo/backer/deamon/internal/platform/version"
 )
 
-type ApiRegisterer func(*gin.RouterGroup)
+type ApiRegisterer func(*gin.RouterGroup, *service.Service)
 
 var API_VERSION_HANDLER = map[int]ApiRegisterer{
 	1: v1.RegisterHandlers,
@@ -37,7 +37,7 @@ func NewEngine(s *service.Service) *gin.Engine {
 	api.GET("/version", _version)
 
 	// Registers the handlers given the API version
-	API_VERSION_HANDLER[constants.API_VERSION](api)
+	API_VERSION_HANDLER[constants.API_VERSION](api, s)
 
 	return r
 }

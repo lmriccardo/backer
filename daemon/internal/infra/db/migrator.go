@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/lmriccardo/backer/deamon/internal/constants"
-	"github.com/lmriccardo/backer/deamon/internal/db/migrations"
+	"github.com/lmriccardo/backer/deamon/internal/infra/db/migrations"
+	"github.com/lmriccardo/backer/deamon/internal/platform/constants"
 )
 
 type MigrationFunc func(context.Context, *sql.Tx) error

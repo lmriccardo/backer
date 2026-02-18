@@ -8,14 +8,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
-	"github.com/lmriccardo/backer/deamon/internal/core"
+	"github.com/lmriccardo/backer/deamon/internal/domain"
 	"github.com/robfig/cron/v3"
 )
-
-/*
-Create validators for:
-- schedule_value
-*/
 
 func validateEnum[T comparable](fl validator.FieldLevel, value ...T) bool {
 	s, ok := fl.Field().Interface().(T)
@@ -33,11 +28,11 @@ func deleteModeValidator(fl validator.FieldLevel) bool {
 }
 
 func webhookTypeValidator(fl validator.FieldLevel) bool {
-	return validateEnum(fl, core.WebhookDiscord)
+	return validateEnum(fl, domain.WebhookDiscord)
 }
 
 func eventTypeValidator(fl validator.FieldLevel) bool {
-	return validateEnum(fl, core.EventFailure, core.EventSuccess)
+	return validateEnum(fl, domain.EventFailure, domain.EventSuccess)
 }
 
 func timeoutValidator(fl validator.FieldLevel) bool {

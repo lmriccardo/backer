@@ -3,8 +3,8 @@ package service
 import (
 	"context"
 
-	"github.com/lmriccardo/backer/deamon/internal/utils"
-	"github.com/lmriccardo/backer/deamon/internal/utils/ilock"
+	"github.com/lmriccardo/backer/deamon/internal/platform/ilock"
+	"github.com/lmriccardo/backer/deamon/internal/platform/utils"
 )
 
 type Service struct {
