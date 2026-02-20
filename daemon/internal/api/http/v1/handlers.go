@@ -1,12 +1,20 @@
 package v1
 
 import (
+	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/lmriccardo/backer/deamon/internal/app/service"
 	"github.com/lmriccardo/backer/deamon/internal/platform/utils"
 )
+
+type HandlerFunc = func(ctx *gin.Context, srv *service.Service)
+
+func WrapHandler(srv *service.Service, fn HandlerFunc) gin.HandlerFunc {
+	return func(ctx *gin.Context) { fn(ctx, srv) }
+}
 
 func HandleListJobs(ctx *gin.Context, srv *service.Service) {
 
@@ -15,6 +23,8 @@ func HandleListJobs(ctx *gin.Context, srv *service.Service) {
 func HandleJobCreateRequest(ctx *gin.Context, srv *service.Service) {
 	// Binds the request body to the request structure and applies
 	// defaults where necessary
+	log.Println("[NEW REQUEST] Received new job creation request")
+
 	var req CreateJobRequest
 	if err := utils.MustBindWithJSON(&req, ctx.Request); err != nil {
 		ctx.JSON(400, gin.H{"error": err.Error()})
@@ -26,12 +36,21 @@ func HandleJobCreateRequest(ctx *gin.Context, srv *service.Service) {
 		return
 	}
 
+	// Create the job and
 	if err := srv.CreateJob(ctx.Request.Context(), &req, nil); err != nil {
-		ctx.JSON(400, gin.H{"error": err.Error()})
+		// If the error returned by the function regards the job
+		// with that name already existing, then we need to return 409
+		status_code := 400
+		if _, ok := err.(*service.DuplicateJobNameError); ok {
+			status_code = 409
+		}
+		ctx.JSON(status_code, gin.H{"error": err.Error()})
 		return
 	}
 
-	ctx.Status(http.StatusOK)
+	ctx.JSON(http.StatusOK, gin.H{
+		"message": fmt.Sprintf("Created job %v", req.Name),
+	})
 }
 
 // RegisterHandlers registers v1 handlers
@@ -39,6 +58,6 @@ func RegisterHandlers(rg *gin.RouterGroup, srv *service.Service) {
 	_ = RegisterValidators() // Registers all validators
 
 	rg.Group("/v1").Group("/jobs").
-		GET("/", func(ctx *gin.Context) { HandleListJobs(ctx, srv) }).
-		POST("/create", func(ctx *gin.Context) { HandleJobCreateRequest(ctx, srv) })
+		GET("/", WrapHandler(srv, HandleListJobs)).
+		POST("/create", WrapHandler(srv, HandleJobCreateRequest))
 }

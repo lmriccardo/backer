@@ -18,7 +18,7 @@ func MigrationV1(ctx context.Context, tx *sql.Tx) error {
 		);
 
 		CREATE INDEX idx_jobs_enabled ON jobs(enabled);
-		CREATE INDEX idx_jobs_name ON jobs(name);
+		CREATE UNIQUE INDEX idx_jobs_name ON jobs(name);
 	`)
 	return err
 }

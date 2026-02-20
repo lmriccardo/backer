@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 )
 
 type WithDefault interface {
@@ -50,6 +51,17 @@ func BackerLogHome() (string, error) {
 		return "", err
 	}
 	return createDir(filepath.Join(home, "log"))
+}
+
+// BackerExcludeHome returns the exclude home folder for
+// any job configuration if the exclude output path is
+// not given at creation time
+func BackerExcludeHome() (string, error) {
+	home, err := BackerHome()
+	if err != nil {
+		return "", err
+	}
+	return createDir(filepath.Join(home, "excludes"))
 }
 
 // RegistryFile Returns the path to the registry file
@@ -164,4 +176,16 @@ func MustBindWithJSON[T any](dst *T, req *http.Request) error {
 	// Finally, Apply default values
 	ApplyDefault(dst)
 	return nil
+}
+
+// GetDomainFromEmail splits the email string by the @ sign and
+// returns the "right-hand side" of the split.
+func GetDomainFromEmail(email string) string {
+	return strings.Split(email, "@")[1]
+}
+
+// JSONToString marshals an input json structure into a string
+func JSONToString[T any](in *T) string {
+	data, _ := json.Marshal(in)
+	return string(data)
 }

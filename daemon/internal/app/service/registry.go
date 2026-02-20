@@ -3,7 +3,9 @@ package service
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log"
+	"time"
 
 	apirequests "github.com/lmriccardo/backer/deamon/internal/api/http/v1/requests"
 	"github.com/lmriccardo/backer/deamon/internal/domain"
@@ -19,12 +21,14 @@ const (
 	ListAllJobs RegistryStatementType = iota
 	ListJobsWithStatus
 	SearchJobByName
+	InsertNewJob
 )
 
 var REGISTRY_STATEMENTS = map[RegistryStatementType]string{
 	ListAllJobs:        `SELECT id, name, enabled, config_json FROM jobs`,
 	ListJobsWithStatus: `SELECT id, name, enabled, config_json FROM jobs WHERE enabled = ?`,
 	SearchJobByName:    `SELECT EXISTS ( SELECT 1 FROM jobs WHERE name = ? )`,
+	InsertNewJob:       `INSERT INTO jobs(name, enabled, config_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
 }
 
 type IRegistry interface {
@@ -181,7 +185,7 @@ func (r *Registry) SearchJobByName(ctx context.Context, name string, tx *sql.Tx)
 
 	current_error := (error)(nil)
 	if !exists {
-		current_error = &InvalidJobNameError{Name: name}
+		current_error = NewInvalidJobNameError(name)
 	}
 	return exists, current_error
 }
@@ -190,10 +194,44 @@ func (r *Registry) SearchJobByName(ctx context.Context, name string, tx *sql.Tx)
 // description into a job configuration and finally save the job
 // into the registry database
 func (r *Registry) CreateJob(ctx context.Context, job *apirequests.CreateJobRequest, tx *sql.Tx) error {
+	log.Printf("Registering new backup job with name: %s", job.Name)
+
 	// 1. Before starting validating the input job, we should check that
 	// there not exists another job with the same name. Job names are unique.
-	if _, err := r.SearchJobByName(ctx, job.Name, nil); err != nil {
+	result, err := r.SearchJobByName(ctx, job.Name, nil)
+	_, ok := err.(*InvalidJobNameError)
+	if err != nil && !ok {
+		log.Printf("(SearchJobByName Error): %v", err.Error())
 		return err
+	}
+
+	// If the job exists returns a new error
+	if result {
+		log.Printf("(Error): Job %v already registered", job.Name)
+		return NewDuplicateJobNameError(job.Name)
+	}
+
+	// 2. Create the job structure from the request
+	registry_job, err := createJob(job)
+	if err != nil {
+		log.Printf("(Error) when creating Job: %v", err.Error())
+		return err
+	}
+
+	now := time.Now().UTC()
+	formatted := now.Format("2006-01-02 15:04:05")
+
+	// 3. Inser the job into the table
+	stmt := r.bindStatementToTx(ctx, tx, InsertNewJob)
+	config := utils.JSONToString(&registry_job.Config)
+	_, err = stmt.ExecContext(ctx, registry_job.Name, registry_job.Status,
+		config, formatted, formatted)
+
+	if err != nil {
+		log.Printf("(Database Execution Error): %v", err.Error())
+		return NewDatabaseError(
+			fmt.Sprintf("unable to insert new job %v", job.Name),
+		)
 	}
 
 	return nil
