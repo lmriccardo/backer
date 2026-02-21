@@ -2,8 +2,11 @@
 **/bin/*
 **/__pycache__/*
 **/venv/*
+**/.venv/*
 **/*.egg-info/
 *.code-workspace
 .env
 **/.pytest_cache/
 example/
+daemon/docs/*.yaml
+**/dist/

@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/lmriccardo/backer/deamon/internal/infra/db/migrations"
-	"github.com/lmriccardo/backer/deamon/internal/platform/constants"
+	"github.com/lmriccardo/backer/deamon/internal/db/migrations"
+	"github.com/lmriccardo/backer/deamon/internal/platform/version"
 )
 
 type MigrationFunc func(context.Context, *sql.Tx) error
@@ -31,15 +31,15 @@ func EnsureSchema(ctx context.Context, db *sql.DB) error {
 	}
 
 	// 3. Update the current schema version up to latest one
-	if curr_version < constants.LATEST_DB_VERSION {
+	if curr_version < version.LATEST_DB_VERSION {
 		log.Printf(
 			"Current schema version %d is too old ( Latest is %d )",
 			curr_version,
-			constants.LATEST_DB_VERSION,
+			version.LATEST_DB_VERSION,
 		)
 	}
 
-	for curr_version < constants.LATEST_DB_VERSION {
+	for curr_version < version.LATEST_DB_VERSION {
 		next_version := curr_version + 1
 		if err := applyMigration(ctx, db, next_version); err != nil {
 			return err

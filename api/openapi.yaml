@@ -1,0 +1,55 @@
+basePath: /api
+definitions:
+  VersionInfo:
+    properties:
+      api:
+        type: integer
+      commit:
+        type: string
+      date:
+        type: string
+      go_version:
+        type: string
+      version:
+        type: string
+    type: object
+  HealthzResponse:
+    properties:
+      ok:
+        type: boolean
+      version:
+        $ref: '#/definitions/VersionInfo'
+    type: object
+info:
+  contact: {}
+  description: Backup automation daemon API
+  title: Backer API
+  version: "1.0"
+paths:
+  /healthz:
+    get:
+      description: Returns service health status and version
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/HealthzResponse'
+      summary: Health Check
+      tags:
+      - system
+  /version:
+    get:
+      description: Returns current running service and api version
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/VersionInfo'
+      summary: Get Service Version
+      tags:
+      - system
+swagger: "2.0"

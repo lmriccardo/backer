@@ -1,3 +1,8 @@
+// @title Backer API
+// @version 1.0
+// @description Backup automation daemon API
+// @BasePath /api
+
 package main
 
 import (
@@ -11,10 +16,11 @@ import (
 	"syscall"
 	"time"
 
-	httpapi "github.com/lmriccardo/backer/deamon/internal/api/http"
+	"github.com/lmriccardo/backer/deamon/docs"
+	"github.com/lmriccardo/backer/deamon/internal/api"
 	"github.com/lmriccardo/backer/deamon/internal/app/service"
-	"github.com/lmriccardo/backer/deamon/internal/infra/transport"
 	"github.com/lmriccardo/backer/deamon/internal/platform/version"
+	"github.com/lmriccardo/backer/deamon/internal/transport"
 )
 
 func main() {
@@ -35,7 +41,7 @@ func main() {
 		log.Fatalf("when creating the service: %v", err)
 	}
 
-	engine := httpapi.NewEngine(service)
+	engine := api.NewEngine(service)
 
 	// Then create the server listener based on the current OS
 	t, err := transport.NewTransport()
@@ -43,14 +49,19 @@ func main() {
 		log.Fatal(err)
 	}
 
-	log.Printf("Listening on %s\n", t.Uri())
 	srv := &http.Server{Handler: engine}
 
 	// Start the server in a separated go routing and catch
 	// errors on a separated channel
 	serverErr := make(chan error, 1)
+
+	// Runs the server documentation
+	docsrv := docs.RunDocsServer("127.0.0.1:8081", serverErr)
+
 	go func() {
+		log.Printf("Listening on %s\n", t.Uri())
 		err := srv.Serve(t.Listener)
+
 		// Serve returns ErrServerClosed on normal shutdown
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			serverErr <- err
@@ -78,9 +89,10 @@ func main() {
 
 	defer cancel()
 
-	_ = srv.Shutdown(sdwnCtx) // stops HTTP, drains requests
-	t.Close()                 // cleanup (listener close + unlink etc.)
-	service.Close()           // Cleanup the service
+	_ = srv.Shutdown(sdwnCtx)    // stops HTTP, drains requests
+	_ = docsrv.Shutdown(sdwnCtx) // Stop the HTTP Documentation server
+	t.Close()                    // cleanup (listener close + unlink etc.)
+	service.Close()              // Cleanup the service
 
 	// Wait for Serve goroutine to finish before exiting main
 	if err := <-serverErr; err != nil {

@@ -5,3 +5,5 @@ tabulate>=0.9
 pytest>=8.3
 requests>=2.32
 rich>=13.7
+aiohttp>=3.13
+packaging>=26.0

@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"strconv"
 
-	apirequests "github.com/lmriccardo/backer/deamon/internal/api/http/v1/requests"
+	apirequests "github.com/lmriccardo/backer/deamon/internal/api/v1/requests"
 	"github.com/lmriccardo/backer/deamon/internal/domain"
 	"github.com/lmriccardo/backer/deamon/internal/platform/constants"
 	"github.com/lmriccardo/backer/deamon/internal/platform/utils"

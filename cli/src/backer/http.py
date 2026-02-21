@@ -1,0 +1,124 @@
+"""
+Module with some useful functions to communicate
+with the backerd (the backer daemon) using its HTTP
+REST API. 
+"""
+from __future__ import annotations
+
+import os
+import aiohttp
+import aiohttp.typedefs
+import backer.apitypes as apitypes
+
+from enum import StrEnum
+from pathlib import Path
+from dataclasses import dataclass
+
+from typing import (
+    overload, Dict, Any, TypedDict, 
+    Unpack, TypeVar, Optional,
+    Type
+)
+
+_T = TypeVar('_T')
+
+SOCK_NAME = "backerd.sock"
+
+class _RequestOptions(TypedDict, total=False):
+    params: aiohttp.typedefs.Query
+    headers: Dict[str, Any]
+    body: Dict[str,Any]
+
+class HttpMethod(StrEnum):
+    NULL = ""
+    GET  = "GET"
+    POST = "POST"
+
+@dataclass(frozen=True)
+class Endpoint:
+    route  : str
+    method : HttpMethod = HttpMethod.NULL
+    model  : Optional[Type[apitypes.ResponseModel]] = None
+
+    @overload
+    def __truediv__(self, other: str) -> 'Endpoint': ...
+    @overload
+    def __truediv__(self, other: 'Endpoint') -> 'Endpoint': ...
+
+    def __truediv__(self, other) -> 'Endpoint':
+        if not (isinstance(other, str) or isinstance(other, Endpoint)):
+            return NotImplemented()
+
+        if isinstance(other, str):
+            # Input strings usually is for a route group, therefore
+            # we can leave the model and method to default None, NULL
+            return Endpoint(self.route + other)
+        
+        return Endpoint(self.route + other.route, other.method, other.model)
+    
+    def __eq__(self, other: 'Endpoint') -> bool:
+        return self.route  == other.route \
+           and self.method == other.method
+
+class Endpoints:
+    _Root    : Endpoint = Endpoint("/api")
+    Version  : Endpoint = _Root / Endpoint("/version", HttpMethod.GET, apitypes.VersionResponse)
+    Healthz  : Endpoint = _Root / Endpoint("/healthz", HttpMethod.GET, apitypes.HealthzResponse)
+
+    def __init__(self): self._version = "/v1"
+    def version(self, v: int) -> None:
+        self._version = f"/v{v}"
+    
+    @property
+    def _RootVers(self) -> Endpoint: return self._Root / self._version
+    @property
+    def Jobs(self) -> Endpoint: return self._RootVers / Endpoint("/jobs", HttpMethod.GET)
+    @property
+    def CreateJob(self) -> Endpoint: return self.Jobs / Endpoint("/create", HttpMethod.POST)
+
+@dataclass(frozen=True)
+class _Response[_T]:
+    code : int
+    body : _T
+
+def get_unix_socket() -> str:
+    """ Returns the unix socket for backerd """
+    basedir = os.getenv("XDG_RUNTIME_DIR")
+    return str(Path(basedir) / SOCK_NAME)
+
+class BackerClient:
+    def __init__(self, sock_path: str) -> None:
+        self._sock_path = sock_path
+        self._session: aiohttp.ClientSession | None = None
+
+    async def make_request(
+        self, endpoint: Endpoint, **kwargs: Unpack[_RequestOptions] 
+    ) -> _Response[_T | Dict[str,Any]]:
+        assert self._session is not None, "backer client must have a session"
+
+        resp = await self._session.request(
+            method=endpoint.method.value, url=f"http://localhost{endpoint.route}", **kwargs
+        )
+        
+        data = await resp.json() # Get the json body from the response
+        data = endpoint.model.model_validate(data)
+
+        custom_resp = _Response(resp.status, data)
+        resp.close() # Close the response before leaving
+        return custom_resp
+
+    async def create(self) -> None:
+        connector = aiohttp.UnixConnector(path=self._sock_path)
+        self._session = aiohttp.ClientSession(connector=connector)
+
+    async def release(self) -> None:
+        if self._session is None: return
+        await self._session.close()
+        self._session = None
+
+    async def __aenter__(self) -> 'BackerClient':
+        await self.create()
+        return self
+    
+    async def __aexit__(self, *args):
+        await self.release()

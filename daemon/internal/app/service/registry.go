@@ -7,9 +7,9 @@ import (
 	"log"
 	"time"
 
-	apirequests "github.com/lmriccardo/backer/deamon/internal/api/http/v1/requests"
+	apirequests "github.com/lmriccardo/backer/deamon/internal/api/v1/requests"
+	"github.com/lmriccardo/backer/deamon/internal/db"
 	"github.com/lmriccardo/backer/deamon/internal/domain"
-	"github.com/lmriccardo/backer/deamon/internal/infra/db"
 	"github.com/lmriccardo/backer/deamon/internal/platform/utils"
 	_ "modernc.org/sqlite"
 )

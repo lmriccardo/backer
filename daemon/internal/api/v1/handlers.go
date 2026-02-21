@@ -27,7 +27,7 @@ func HandleJobCreateRequest(ctx *gin.Context, srv *service.Service) {
 
 	var req CreateJobRequest
 	if err := utils.MustBindWithJSON(&req, ctx.Request); err != nil {
-		ctx.JSON(400, gin.H{"error": err.Error()})
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -40,15 +40,15 @@ func HandleJobCreateRequest(ctx *gin.Context, srv *service.Service) {
 	if err := srv.CreateJob(ctx.Request.Context(), &req, nil); err != nil {
 		// If the error returned by the function regards the job
 		// with that name already existing, then we need to return 409
-		status_code := 400
+		status_code := http.StatusBadRequest
 		if _, ok := err.(*service.DuplicateJobNameError); ok {
-			status_code = 409
+			status_code = http.StatusConflict
 		}
 		ctx.JSON(status_code, gin.H{"error": err.Error()})
 		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{
+	ctx.JSON(http.StatusCreated, gin.H{
 		"message": fmt.Sprintf("Created job %v", req.Name),
 	})
 }

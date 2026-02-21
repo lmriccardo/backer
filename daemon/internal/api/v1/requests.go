@@ -1,6 +1,6 @@
 package v1
 
-import "github.com/lmriccardo/backer/deamon/internal/api/http/v1/requests"
+import "github.com/lmriccardo/backer/deamon/internal/api/v1/requests"
 
 type CreateJobRequest = requests.CreateJobRequest
 type RemoteConfig = requests.RemoteConfig
