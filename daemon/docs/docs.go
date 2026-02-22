@@ -35,6 +35,52 @@ const docTemplate = `{
                 }
             }
         },
+        "/v1/jobs/create": {
+            "post": {
+                "description": "Request the registration of a new job",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "jobs"
+                ],
+                "summary": "Job Create Request",
+                "parameters": [
+                    {
+                        "description": "Job configuration",
+                        "name": "job",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_api_v1.CreateJobRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_api_v1.BaseResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Validation Error",
+                        "schema": {
+                            "$ref": "#/definitions/internal_api_v1.BaseResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Duplicate Job name",
+                        "schema": {
+                            "$ref": "#/definitions/internal_api_v1.BaseResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/version": {
             "get": {
                 "description": "Returns current running service and api version",
@@ -57,6 +103,369 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "github_com_lmriccardo_backer_deamon_internal_api_v1_requests.DeleteType": {
+            "type": "string",
+            "enum": [
+                "",
+                "begin",
+                "after",
+                "during",
+                "delay",
+                "excluded"
+            ],
+            "x-enum-varnames": [
+                "DeleteInvalid",
+                "DeleteBegin",
+                "DeleteAfter",
+                "DeleteDuring",
+                "DeleteDelay",
+                "DeleteExcluded"
+            ]
+        },
+        "github_com_lmriccardo_backer_deamon_internal_api_v1_requests.EmailNotification": {
+            "type": "object",
+            "required": [
+                "from",
+                "password",
+                "to"
+            ],
+            "properties": {
+                "from": {
+                    "description": "The email of the sender",
+                    "type": "string"
+                },
+                "password": {
+                    "description": "The account password used to authentication to the SMTP server",
+                    "type": "string"
+                },
+                "smtp": {
+                    "description": "Optional SMTP server",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_lmriccardo_backer_deamon_internal_api_v1_requests.SMTPConfig"
+                        }
+                    ]
+                },
+                "to": {
+                    "description": "A list of recipients for the notification email",
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "github_com_lmriccardo_backer_deamon_internal_api_v1_requests.LogRetentionCfg": {
+            "type": "object",
+            "properties": {
+                "max_spare_files": {
+                    "description": "Maximum number of spare log files",
+                    "type": "integer",
+                    "minimum": 0,
+                    "example": 10
+                },
+                "retention_window": {
+                    "description": "Log retention window in days",
+                    "type": "integer",
+                    "minimum": 0,
+                    "example": 7
+                }
+            }
+        },
+        "github_com_lmriccardo_backer_deamon_internal_api_v1_requests.NotificationCfg": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "description": "Email notification system configuration",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_lmriccardo_backer_deamon_internal_api_v1_requests.EmailNotification"
+                        }
+                    ]
+                },
+                "webhooks": {
+                    "description": "Webhooks notification system list",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_lmriccardo_backer_deamon_internal_api_v1_requests.WebhookNotification"
+                    }
+                }
+            }
+        },
+        "github_com_lmriccardo_backer_deamon_internal_api_v1_requests.RemoteConfig": {
+            "type": "object",
+            "required": [
+                "dest",
+                "host",
+                "password",
+                "user"
+            ],
+            "properties": {
+                "dest": {
+                    "description": "Remote destination module and folder",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_lmriccardo_backer_deamon_internal_api_v1_requests.RemoteDestCfg"
+                        }
+                    ]
+                },
+                "host": {
+                    "description": "Server Hostname/IPv4 address",
+                    "type": "string",
+                    "example": "host.domain"
+                },
+                "password": {
+                    "description": "Password file for non-interactive",
+                    "type": "string",
+                    "example": "password-file"
+                },
+                "port": {
+                    "description": "Remote server port",
+                    "type": "integer",
+                    "maximum": 65535,
+                    "minimum": 1,
+                    "example": 1234
+                },
+                "user": {
+                    "description": "The username to connect with",
+                    "type": "string",
+                    "example": "admin"
+                }
+            }
+        },
+        "github_com_lmriccardo_backer_deamon_internal_api_v1_requests.RemoteDestCfg": {
+            "type": "object",
+            "required": [
+                "folder",
+                "module"
+            ],
+            "properties": {
+                "folder": {
+                    "description": "The destination folder inside the module",
+                    "type": "string",
+                    "example": "dest_folder"
+                },
+                "module": {
+                    "description": "The module name",
+                    "type": "string",
+                    "example": "module_name"
+                }
+            }
+        },
+        "github_com_lmriccardo_backer_deamon_internal_api_v1_requests.RsyncConfig": {
+            "type": "object",
+            "required": [
+                "sources"
+            ],
+            "properties": {
+                "exclude_from": {
+                    "description": "Base file with a bunch of paths to exclude",
+                    "type": "string"
+                },
+                "exclude_output_folder": {
+                    "description": "Folder where the expanded excludes are saved into.",
+                    "type": "string"
+                },
+                "excludes": {
+                    "description": "Additional spare exclude paths",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "includes": {
+                    "description": "Folders to include ( removes from excludes if present )",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "options": {
+                    "description": "Rsync option configuration",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_lmriccardo_backer_deamon_internal_api_v1_requests.RsyncOptions"
+                        }
+                    ]
+                },
+                "sources": {
+                    "description": "Sources to copy into the destination",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "github_com_lmriccardo_backer_deamon_internal_api_v1_requests.RsyncOptions": {
+            "type": "object",
+            "properties": {
+                "compress": {
+                    "description": "Enable or Disable compression before trasmitting",
+                    "type": "boolean"
+                },
+                "delete": {
+                    "description": "Delete mode one of [ before, after, during, delay and excluded ]",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_lmriccardo_backer_deamon_internal_api_v1_requests.DeleteType"
+                        }
+                    ],
+                    "example": "after"
+                },
+                "itemize_changes": {
+                    "description": "Output a change-summary for all updates",
+                    "type": "boolean"
+                },
+                "keep_devices": {
+                    "description": "Keep devices file (` + "`" + `/dev/null` + "`" + `, ` + "`" + `/dev/sda` + "`" + `, ...)",
+                    "type": "boolean"
+                },
+                "keep_specials": {
+                    "description": "Keep specials files likes UNIX sockets or FIFOs.",
+                    "type": "boolean"
+                },
+                "show_progress": {
+                    "description": "Shows the progress in the log output",
+                    "type": "boolean"
+                },
+                "verbose": {
+                    "description": "Enable/Disable verbosity",
+                    "type": "boolean"
+                }
+            }
+        },
+        "github_com_lmriccardo_backer_deamon_internal_api_v1_requests.SMTPConfig": {
+            "type": "object",
+            "required": [
+                "port",
+                "server",
+                "ssl"
+            ],
+            "properties": {
+                "port": {
+                    "description": "The SMTP Server port",
+                    "type": "integer",
+                    "maximum": 65535,
+                    "minimum": 1
+                },
+                "server": {
+                    "description": "The SMTP server host",
+                    "type": "string"
+                },
+                "ssl": {
+                    "description": "Tell if the SMTP server has SSL enabled or not",
+                    "type": "boolean"
+                }
+            }
+        },
+        "github_com_lmriccardo_backer_deamon_internal_api_v1_requests.ScheduleConfig": {
+            "type": "object",
+            "required": [
+                "day",
+                "hour",
+                "minute",
+                "month",
+                "weekday"
+            ],
+            "properties": {
+                "day": {
+                    "description": "Day of the month with Range 1-31",
+                    "type": "string",
+                    "example": "*"
+                },
+                "hour": {
+                    "description": "Range 0-23",
+                    "type": "string",
+                    "example": "6"
+                },
+                "minute": {
+                    "description": "Range 0-59",
+                    "type": "string",
+                    "example": "0"
+                },
+                "month": {
+                    "description": "Range 1-12",
+                    "type": "string",
+                    "example": "*"
+                },
+                "weekday": {
+                    "description": "Range 0-7 (Sun = 0 or 7)",
+                    "type": "string",
+                    "example": "0"
+                }
+            }
+        },
+        "github_com_lmriccardo_backer_deamon_internal_api_v1_requests.WebhookNotification": {
+            "type": "object",
+            "required": [
+                "name",
+                "type",
+                "url"
+            ],
+            "properties": {
+                "events": {
+                    "description": "Subscribed Events: failure, success",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_lmriccardo_backer_deamon_internal_domain.EventType"
+                    }
+                },
+                "headers": {
+                    "description": "Additional headers used for the requests",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "max_retries": {
+                    "description": "Maximum number of retries",
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "name": {
+                    "description": "The name of the service (there can be duplicates)",
+                    "type": "string"
+                },
+                "timeout": {
+                    "description": "Timeout for receiving the response after sending the notification.",
+                    "type": "string"
+                },
+                "type": {
+                    "description": "The type of the webhook service endpoint",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_lmriccardo_backer_deamon_internal_domain.Webhook"
+                        }
+                    ]
+                },
+                "url": {
+                    "description": "The endpoint URL of the service",
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_lmriccardo_backer_deamon_internal_domain.EventType": {
+            "type": "string",
+            "enum": [
+                "failure",
+                "success"
+            ],
+            "x-enum-varnames": [
+                "EventFailure",
+                "EventSuccess"
+            ]
+        },
+        "github_com_lmriccardo_backer_deamon_internal_domain.Webhook": {
+            "type": "string",
+            "enum": [
+                "discord"
+            ],
+            "x-enum-varnames": [
+                "WebhookDiscord"
+            ]
+        },
         "github_com_lmriccardo_backer_deamon_internal_platform_version.Info": {
             "type": "object",
             "properties": {
@@ -87,6 +496,97 @@ const docTemplate = `{
                     "$ref": "#/definitions/github_com_lmriccardo_backer_deamon_internal_platform_version.Info"
                 }
             }
+        },
+        "internal_api_v1.BaseResponse": {
+            "type": "object",
+            "properties": {
+                "errors": {
+                    "description": "Errors filled up only if failure",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "message": {
+                    "description": "Message filled up only if success",
+                    "type": "string"
+                },
+                "status": {
+                    "description": "Response status",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/internal_api_v1.StatusType"
+                        }
+                    ]
+                }
+            }
+        },
+        "internal_api_v1.CreateJobRequest": {
+            "type": "object",
+            "required": [
+                "name",
+                "remote",
+                "rsync",
+                "schedule"
+            ],
+            "properties": {
+                "log_retention": {
+                    "description": "Log retention configuration",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_lmriccardo_backer_deamon_internal_api_v1_requests.LogRetentionCfg"
+                        }
+                    ]
+                },
+                "name": {
+                    "description": "The name of the target/job",
+                    "type": "string",
+                    "example": "full_backup"
+                },
+                "notification": {
+                    "description": "Notification systems configuration",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_lmriccardo_backer_deamon_internal_api_v1_requests.NotificationCfg"
+                        }
+                    ]
+                },
+                "remote": {
+                    "description": "The remote configuration",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_lmriccardo_backer_deamon_internal_api_v1_requests.RemoteConfig"
+                        }
+                    ]
+                },
+                "rsync": {
+                    "description": "Rsync configuration options",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_lmriccardo_backer_deamon_internal_api_v1_requests.RsyncConfig"
+                        }
+                    ]
+                },
+                "schedule": {
+                    "description": "Job Schedule configuration",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_lmriccardo_backer_deamon_internal_api_v1_requests.ScheduleConfig"
+                        }
+                    ]
+                }
+            }
+        },
+        "internal_api_v1.StatusType": {
+            "type": "integer",
+            "enum": [
+                0,
+                1
+            ],
+            "x-enum-varnames": [
+                "StatusSuccess",
+                "StatusFailure"
+            ]
         }
     }
 }`

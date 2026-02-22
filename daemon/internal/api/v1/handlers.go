@@ -20,6 +20,16 @@ func HandleListJobs(ctx *gin.Context, srv *service.Service) {
 
 }
 
+// @Summary Job Create Request
+// @Description Request the registration of a new job
+// @Tags jobs
+// @Accept json
+// @Produce json
+// @Param job body CreateJobRequest true "Job configuration"
+// @Success 200 {object} BaseResponse
+// @Failure 400 {object} BaseResponse "Validation Error"
+// @Failure 409 {object} BaseResponse "Duplicate Job name"
+// @Router /v1/jobs/create [post]
 func HandleJobCreateRequest(ctx *gin.Context, srv *service.Service) {
 	// Binds the request body to the request structure and applies
 	// defaults where necessary
@@ -27,12 +37,13 @@ func HandleJobCreateRequest(ctx *gin.Context, srv *service.Service) {
 
 	var req CreateJobRequest
 	if err := utils.MustBindWithJSON(&req, ctx.Request); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		ctx.JSON(http.StatusBadRequest, NewErrorResponseFromErrs(err))
 		return
 	}
 
 	// Validates the request payload using internal gin validator
-	if ok := ValidateRequest(req, ctx); !ok {
+	if ok, errs := ValidateRequest(req); !ok {
+		ctx.JSON(http.StatusBadRequest, NewErrorResponseFromErrs(errs...))
 		return
 	}
 
@@ -44,13 +55,12 @@ func HandleJobCreateRequest(ctx *gin.Context, srv *service.Service) {
 		if _, ok := err.(*service.DuplicateJobNameError); ok {
 			status_code = http.StatusConflict
 		}
-		ctx.JSON(status_code, gin.H{"error": err.Error()})
+		ctx.JSON(status_code, NewErrorResponseFromErrs(err))
 		return
 	}
 
-	ctx.JSON(http.StatusCreated, gin.H{
-		"message": fmt.Sprintf("Created job %v", req.Name),
-	})
+	msg := fmt.Sprintf("Created job %v", req.Name)
+	ctx.JSON(http.StatusCreated, NewSuccessResponse(msg))
 }
 
 // RegisterHandlers registers v1 handlers

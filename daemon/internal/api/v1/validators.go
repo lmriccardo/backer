@@ -5,7 +5,6 @@ import (
 	"regexp"
 	"slices"
 
-	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
 	"github.com/lmriccardo/backer/deamon/internal/domain"
@@ -95,29 +94,26 @@ func RegisterValidators() error {
 	return nil
 }
 
-func FormatValidatorError(err error) ([]map[string]string, bool) {
+func FormatValidatorError(err error) ([]error, bool) {
 	if verrs, ok := err.(validator.ValidationErrors); ok {
-		out := make([]map[string]string, 0, len(verrs))
+		out := make([]error, 0, len(verrs))
 		for _, e := range verrs {
-			out = append(out, map[string]string{
-				"field": e.Field(),
-				"tag":   e.Tag(),
-				"param": e.Param(),
-			})
+			out = append(out, fmt.Errorf(
+				"Validation failed for field %s (tag %s, param %s)",
+				e.Field(), e.Tag(), e.Param(),
+			))
 		}
 		return out, true
 	}
 	return nil, false
 }
 
-func ValidateRequest[T any](req T, ctx *gin.Context) bool {
+func ValidateRequest[T any](req T) (bool, []error) {
 	if err := binding.Validator.ValidateStruct(req); err != nil {
 		if verr, ok := FormatValidatorError(err); ok {
-			ctx.JSON(400, gin.H{"errors": verr})
-			return false
+			return false, verr
 		}
-		ctx.JSON(400, gin.H{"error": err.Error()})
-		return false
+		return false, []error{err}
 	}
-	return true
+	return true, nil
 }

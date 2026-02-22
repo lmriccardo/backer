@@ -9,4 +9,5 @@
 **/.pytest_cache/
 example/
 daemon/docs/*.yaml
+daemon/docs/*.json
 **/dist/

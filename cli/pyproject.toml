@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "backer-cli"
-version = "0.1.2-dev"
+version = "0.1.2-dev1"
 description = "Backup control automation tool"
 readme = "README.md"
 requires-python = ">=3.12"
