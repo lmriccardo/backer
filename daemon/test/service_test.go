@@ -6,14 +6,15 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/lmriccardo/backer/deamon/internal/core"
+	"github.com/lmriccardo/backer/deamon/internal/app/service"
+	"github.com/lmriccardo/backer/deamon/internal/platform/utils"
 	"github.com/stretchr/testify/require"
 )
 
-var service *core.Service
+var _service *service.Service
 
-func mustNewService(ctx context.Context) *core.Service {
-	new_service, err := core.NewService(ctx)
+func mustNewService(ctx context.Context) *service.Service {
+	new_service, err := service.NewService(ctx)
 	if err != nil {
 		panic(err)
 	}
@@ -31,19 +32,19 @@ func TestMain(m *testing.M) {
 
 	defer func() {
 		// Remove the path created for the registry
-		backer_dir, _ := core.BackerHome()
+		backer_dir, _ := utils.BackerHome()
 		os.RemoveAll(backer_dir)
-		service.Close()
+		_service.Close()
 		cancel()
 		os.Exit(exit_code)
 	}()
 
-	service = mustNewService(ctx)
+	_service = mustNewService(ctx)
 	exit_code = m.Run()
 }
 
 // Tests that multiple service cannot be created given the lock
 func TestMultipleService(t *testing.T) {
-	_, err := core.NewService(context.Background())
+	_, err := service.NewService(context.Background())
 	require.NotNil(t, err, "creating multiple service must raise an error")
 }

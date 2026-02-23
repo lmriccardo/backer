@@ -1,11 +1,16 @@
-package core
+package service
 
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log"
+	"time"
 
+	apirequests "github.com/lmriccardo/backer/deamon/internal/api/v1/requests"
 	"github.com/lmriccardo/backer/deamon/internal/db"
+	"github.com/lmriccardo/backer/deamon/internal/domain"
+	"github.com/lmriccardo/backer/deamon/internal/platform/utils"
 	_ "modernc.org/sqlite"
 )
 
@@ -15,16 +20,23 @@ type RegistryStatementType int
 const (
 	ListAllJobs RegistryStatementType = iota
 	ListJobsWithStatus
+	SearchJobByName
+	InsertNewJob
 )
 
 var REGISTRY_STATEMENTS = map[RegistryStatementType]string{
 	ListAllJobs:        `SELECT id, name, enabled, config_json FROM jobs`,
 	ListJobsWithStatus: `SELECT id, name, enabled, config_json FROM jobs WHERE enabled = ?`,
+	SearchJobByName:    `SELECT EXISTS ( SELECT 1 FROM jobs WHERE name = ? )`,
+	InsertNewJob:       `INSERT INTO jobs(name, enabled, config_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
 }
 
 type IRegistry interface {
 	// ListJobs list all jobs corresponding to the input status
-	ListJobs(ctx context.Context, status JobStatus, tx *sql.Tx) ([]Job, error)
+	ListJobs(ctx context.Context, status domain.JobStatus, tx *sql.Tx) ([]domain.Job, error)
+	CreateJob(ctx context.Context, job *apirequests.CreateJobRequest, tx *sql.Tx) error
+	GetJob(ctx context.Context, name string, tx *sql.Tx) (*domain.Job, error)
+	SearchJobByName(ctx context.Context, name string, tx *sql.Tx) (bool, error)
 
 	// Clean up the entire registry
 	Close()
@@ -42,7 +54,7 @@ func NewRegistry(ctx context.Context) (*Registry, error) {
 
 	// Get the path of the registry file
 	var err error
-	if r.path, err = RegistryFile(); err != nil {
+	if r.path, err = utils.RegistryFile(); err != nil {
 		return nil, err
 	}
 
@@ -102,17 +114,7 @@ func (r *Registry) initDb() error {
 // WithTx provides a transaction wrapper. Every operation perform by the input
 // function is than rolled back to the previous state. Returns an error if any.
 func (r *Registry) WithTx(ctx context.Context, fn func(*sql.Tx) error) error {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	if err := fn(tx); err != nil {
-		return err
-	}
-
-	return tx.Commit()
+	return db.WithTx(r.db, ctx, fn)
 }
 
 func (r *Registry) bindStatementToTx(ctx context.Context, tx *sql.Tx, t RegistryStatementType) *sql.Stmt {
@@ -122,11 +124,11 @@ func (r *Registry) bindStatementToTx(ctx context.Context, tx *sql.Tx, t Registry
 	return r.statements[t]
 }
 
-func (r *Registry) ListJobs(ctx context.Context, status JobStatus, tx *sql.Tx) ([]Job, error) {
+func (r *Registry) ListJobs(ctx context.Context, status domain.JobStatus, tx *sql.Tx) ([]domain.Job, error) {
 	var rows *sql.Rows // Query exec destination
 	var err error      // Error raised by the query
 
-	if status == JobStatusAll {
+	if status == domain.JobStatusAll {
 		rows, err = r.bindStatementToTx(ctx, tx, ListAllJobs).QueryContext(ctx)
 	} else {
 		rows, err = r.bindStatementToTx(ctx, tx, ListJobsWithStatus).QueryContext(ctx, int(status))
@@ -139,20 +141,20 @@ func (r *Registry) ListJobs(ctx context.Context, status JobStatus, tx *sql.Tx) (
 
 	defer rows.Close()
 
-	jobs := []Job{} // Prepare the result
+	jobs := []domain.Job{} // Prepare the result
 	var job_config string
 	for rows.Next() {
 		// Scan the current row and adds the values into the job,
 		// except for the job configuration which should be
 		// decoded from the JSON string stored into the database
-		currjob := Job{}
+		currjob := domain.Job{}
 		err = rows.Scan(&currjob.Id, &currjob.Name, &currjob.Status, &job_config)
 		if err != nil {
 			return nil, err
 		}
 
 		// Decode the JSON configuration from the string
-		if err := ToJsonWithObj(&currjob.Config, job_config); err != nil {
+		if err := utils.ToJsonWithObj(&currjob.Config, job_config); err != nil {
 			return nil, err
 		}
 
@@ -164,6 +166,75 @@ func (r *Registry) ListJobs(ctx context.Context, status JobStatus, tx *sql.Tx) (
 	}
 
 	return jobs, nil
+}
+
+// GetJob returns the job associated with the unique input name, if exists,
+// otherwise it will returns nil and an error is set.
+func (r *Registry) GetJob(ctx context.Context, name string, tx *sql.Tx) (*domain.Job, error) {
+	return nil, nil
+}
+
+// SearchJobByName returns (True, nil) if there exists a registered job with
+// given name, otherwise it will returns (nil, InvalidJobNameError).
+func (r *Registry) SearchJobByName(ctx context.Context, name string, tx *sql.Tx) (bool, error) {
+	var exists bool
+	row := r.bindStatementToTx(ctx, tx, SearchJobByName).QueryRowContext(ctx, name)
+	if err := row.Scan(&exists); err != nil {
+		return false, err
+	}
+
+	current_error := (error)(nil)
+	if !exists {
+		current_error = NewInvalidJobNameError(name)
+	}
+	return exists, current_error
+}
+
+// CreateJob creates a job from the HTTP job request, converts the job
+// description into a job configuration and finally save the job
+// into the registry database
+func (r *Registry) CreateJob(ctx context.Context, job *apirequests.CreateJobRequest, tx *sql.Tx) error {
+	log.Printf("Registering new backup job with name: %s", job.Name)
+
+	// 1. Before starting validating the input job, we should check that
+	// there not exists another job with the same name. Job names are unique.
+	result, err := r.SearchJobByName(ctx, job.Name, nil)
+	_, ok := err.(*InvalidJobNameError)
+	if err != nil && !ok {
+		log.Printf("(SearchJobByName Error): %v", err.Error())
+		return err
+	}
+
+	// If the job exists returns a new error
+	if result {
+		log.Printf("(Error): Job %v already registered", job.Name)
+		return NewDuplicateJobNameError(job.Name)
+	}
+
+	// 2. Create the job structure from the request
+	registry_job, err := createJob(job)
+	if err != nil {
+		log.Printf("(Error) when creating Job: %v", err.Error())
+		return err
+	}
+
+	now := time.Now().UTC()
+	formatted := now.Format("2006-01-02 15:04:05")
+
+	// 3. Inser the job into the table
+	stmt := r.bindStatementToTx(ctx, tx, InsertNewJob)
+	config := utils.JSONToString(&registry_job.Config)
+	_, err = stmt.ExecContext(ctx, registry_job.Name, registry_job.Status,
+		config, formatted, formatted)
+
+	if err != nil {
+		log.Printf("(Database Execution Error): %v", err.Error())
+		return NewDatabaseError(
+			fmt.Sprintf("unable to insert new job %v", job.Name),
+		)
+	}
+
+	return nil
 }
 
 func (r *Registry) Close() {

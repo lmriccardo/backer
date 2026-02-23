@@ -3,8 +3,8 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "backer"
-version = "0.2.0"
+name = "backer-cli"
+version = "0.1.2-dev1"
 description = "Backup control automation tool"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -29,7 +29,9 @@ dependencies = [
   "PyYAML>=6.0",
   "tabulate>=0.9",
   "requests>=2.32",
-  "rich>=13.7"
+  "rich>=13.7",
+  "aiohttp>=3.13",
+  "packaging>=26.0"
 ]
 
 [project.urls]
@@ -39,7 +41,7 @@ Issues = "https://github.com/lmriccardo/backer/issues"
 Changelog = "https://github.com/lmriccardo/backer/releases"
 
 [project.scripts]
-backer = "backercli.cli:main"
+backer = "backer.cli:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

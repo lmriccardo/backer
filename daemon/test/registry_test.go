@@ -11,32 +11,34 @@ import (
 	_ "embed"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/lmriccardo/backer/deamon/internal/core"
+	"github.com/lmriccardo/backer/deamon/internal/app/service"
+	"github.com/lmriccardo/backer/deamon/internal/domain"
+	"github.com/lmriccardo/backer/deamon/internal/platform/utils"
 )
 
 /*
 This tests the registry database functionality.
 */
 
-type RegistryFunc func(context.Context, *core.Registry, *sql.Tx) error
+type RegistryFunc func(context.Context, *service.Registry, *sql.Tx) error
 
 //go:embed testdata/insert_job.sql
 var insertJobs string
 
-var reg *core.Registry = nil
+var reg *service.Registry = nil
 
 // This function ensures that the registry is always created. If an
 // error occur when the registry is created then it fails immediately
-func mustNewRegistry(t *testing.T) *core.Registry {
-	reg, err := core.NewInMemRegistry(context.Background())
+func mustNewRegistry(t *testing.T) *service.Registry {
+	reg, err := service.NewInMemRegistry(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
 	return reg
 }
 
-func testListAllJobs(ctx context.Context, reg *core.Registry, tx *sql.Tx) error {
-	jobs, err := reg.ListJobs(ctx, core.JobStatusAll, tx)
+func testListAllJobs(ctx context.Context, reg *service.Registry, tx *sql.Tx) error {
+	jobs, err := reg.ListJobs(ctx, domain.JobStatusAll, tx)
 	if err != nil {
 		return err
 	}
@@ -48,8 +50,8 @@ func testListAllJobs(ctx context.Context, reg *core.Registry, tx *sql.Tx) error 
 	return nil
 }
 
-func testListEnabledJobs(ctx context.Context, reg *core.Registry, tx *sql.Tx) error {
-	jobs, err := reg.ListJobs(ctx, core.JobStatusEnabled, tx)
+func testListEnabledJobs(ctx context.Context, reg *service.Registry, tx *sql.Tx) error {
+	jobs, err := reg.ListJobs(ctx, domain.JobStatusEnabled, tx)
 	if err != nil {
 		return err
 	}
@@ -58,13 +60,13 @@ func testListEnabledJobs(ctx context.Context, reg *core.Registry, tx *sql.Tx) er
 		return fmt.Errorf("expected 1 jobs, found: %d", len(jobs))
 	}
 
-	expected := core.Job{
+	expected := domain.Job{
 		Id:     1,
 		Name:   "simple_backup",
-		Status: core.JobStatusEnabled,
-		Config: core.JobConfig{
+		Status: domain.JobStatusEnabled,
+		Config: domain.JobConfig{
 			Name:        "simple_backup",
-			Log:         "/path/to/log_folder",
+			Log:         domain.LogConfig{Path: "/path/to/log_folder"},
 			Compression: false,
 			Command:     []string{"ciao"},
 			Notify:      nil,
@@ -78,8 +80,8 @@ func testListEnabledJobs(ctx context.Context, reg *core.Registry, tx *sql.Tx) er
 	return nil
 }
 
-func testListDisabledJobs(ctx context.Context, reg *core.Registry, tx *sql.Tx) error {
-	jobs, err := reg.ListJobs(ctx, core.JobStatusDisabled, tx)
+func testListDisabledJobs(ctx context.Context, reg *service.Registry, tx *sql.Tx) error {
+	jobs, err := reg.ListJobs(ctx, domain.JobStatusDisabled, tx)
 	if err != nil {
 		return err
 	}
@@ -88,13 +90,13 @@ func testListDisabledJobs(ctx context.Context, reg *core.Registry, tx *sql.Tx) e
 		return fmt.Errorf("expected 1 jobs, found: %d", len(jobs))
 	}
 
-	expected := core.Job{
+	expected := domain.Job{
 		Id:     2,
 		Name:   "full_backup",
-		Status: core.JobStatusDisabled,
-		Config: core.JobConfig{
+		Status: domain.JobStatusDisabled,
+		Config: domain.JobConfig{
 			Name:        "full_backup",
-			Log:         "/path/to/log_folder1",
+			Log:         domain.LogConfig{Path: "/path/to/log_folder1"},
 			Compression: true,
 			Command:     []string{"ls"},
 			Notify:      nil,
@@ -123,14 +125,14 @@ func TestMigrations(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer func() {
 		// Remove the path created for the registry
-		backer_dir, _ := core.BackerHome()
+		backer_dir, _ := utils.BackerHome()
 		if err := os.RemoveAll(backer_dir); err != nil {
 			t.Error(err)
 		}
 		cancel()
 	}()
 
-	if _, err := core.NewRegistry(ctx); err != nil {
+	if _, err := service.NewRegistry(ctx); err != nil {
 		t.Error(err)
 	}
 }

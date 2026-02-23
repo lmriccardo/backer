@@ -1,0 +1,400 @@
+basePath: /api
+definitions:
+  github_com_lmriccardo_backer_deamon_internal_api_v1_requests.DeleteType:
+    enum:
+    - ""
+    - begin
+    - after
+    - during
+    - delay
+    - excluded
+    type: string
+    x-enum-varnames:
+    - DeleteInvalid
+    - DeleteBegin
+    - DeleteAfter
+    - DeleteDuring
+    - DeleteDelay
+    - DeleteExcluded
+  github_com_lmriccardo_backer_deamon_internal_api_v1_requests.EmailNotification:
+    properties:
+      from:
+        description: The email of the sender
+        type: string
+      password:
+        description: The account password used to authentication to the SMTP server
+        type: string
+      smtp:
+        allOf:
+        - $ref: '#/definitions/github_com_lmriccardo_backer_deamon_internal_api_v1_requests.SMTPConfig'
+        description: Optional SMTP server
+      to:
+        description: A list of recipients for the notification email
+        items:
+          type: string
+        minItems: 1
+        type: array
+    required:
+    - from
+    - password
+    - to
+    type: object
+  github_com_lmriccardo_backer_deamon_internal_api_v1_requests.LogRetentionCfg:
+    properties:
+      max_spare_files:
+        description: Maximum number of spare log files
+        example: 10
+        minimum: 0
+        type: integer
+      retention_window:
+        description: Log retention window in days
+        example: 7
+        minimum: 0
+        type: integer
+    type: object
+  github_com_lmriccardo_backer_deamon_internal_api_v1_requests.NotificationCfg:
+    properties:
+      email:
+        allOf:
+        - $ref: '#/definitions/github_com_lmriccardo_backer_deamon_internal_api_v1_requests.EmailNotification'
+        description: Email notification system configuration
+      webhooks:
+        description: Webhooks notification system list
+        items:
+          $ref: '#/definitions/github_com_lmriccardo_backer_deamon_internal_api_v1_requests.WebhookNotification'
+        type: array
+    type: object
+  github_com_lmriccardo_backer_deamon_internal_api_v1_requests.RemoteConfig:
+    properties:
+      dest:
+        allOf:
+        - $ref: '#/definitions/github_com_lmriccardo_backer_deamon_internal_api_v1_requests.RemoteDestCfg'
+        description: Remote destination module and folder
+      host:
+        description: Server Hostname/IPv4 address
+        example: host.domain
+        type: string
+      password:
+        description: Password file for non-interactive
+        example: password-file
+        type: string
+      port:
+        description: Remote server port
+        example: 1234
+        maximum: 65535
+        minimum: 1
+        type: integer
+      user:
+        description: The username to connect with
+        example: admin
+        type: string
+    required:
+    - dest
+    - host
+    - password
+    - user
+    type: object
+  github_com_lmriccardo_backer_deamon_internal_api_v1_requests.RemoteDestCfg:
+    properties:
+      folder:
+        description: The destination folder inside the module
+        example: dest_folder
+        type: string
+      module:
+        description: The module name
+        example: module_name
+        type: string
+    required:
+    - folder
+    - module
+    type: object
+  github_com_lmriccardo_backer_deamon_internal_api_v1_requests.RsyncConfig:
+    properties:
+      exclude_from:
+        description: Base file with a bunch of paths to exclude
+        type: string
+      exclude_output_folder:
+        description: Folder where the expanded excludes are saved into.
+        type: string
+      excludes:
+        description: Additional spare exclude paths
+        items:
+          type: string
+        type: array
+      includes:
+        description: Folders to include ( removes from excludes if present )
+        items:
+          type: string
+        type: array
+      options:
+        allOf:
+        - $ref: '#/definitions/github_com_lmriccardo_backer_deamon_internal_api_v1_requests.RsyncOptions'
+        description: Rsync option configuration
+      sources:
+        description: Sources to copy into the destination
+        items:
+          type: string
+        type: array
+    required:
+    - sources
+    type: object
+  github_com_lmriccardo_backer_deamon_internal_api_v1_requests.RsyncOptions:
+    properties:
+      compress:
+        description: Enable or Disable compression before trasmitting
+        type: boolean
+      delete:
+        allOf:
+        - $ref: '#/definitions/github_com_lmriccardo_backer_deamon_internal_api_v1_requests.DeleteType'
+        description: Delete mode one of [ before, after, during, delay and excluded
+          ]
+        example: after
+      itemize_changes:
+        description: Output a change-summary for all updates
+        type: boolean
+      keep_devices:
+        description: Keep devices file (`/dev/null`, `/dev/sda`, ...)
+        type: boolean
+      keep_specials:
+        description: Keep specials files likes UNIX sockets or FIFOs.
+        type: boolean
+      show_progress:
+        description: Shows the progress in the log output
+        type: boolean
+      verbose:
+        description: Enable/Disable verbosity
+        type: boolean
+    type: object
+  github_com_lmriccardo_backer_deamon_internal_api_v1_requests.SMTPConfig:
+    properties:
+      port:
+        description: The SMTP Server port
+        maximum: 65535
+        minimum: 1
+        type: integer
+      server:
+        description: The SMTP server host
+        type: string
+      ssl:
+        description: Tell if the SMTP server has SSL enabled or not
+        type: boolean
+    required:
+    - port
+    - server
+    - ssl
+    type: object
+  github_com_lmriccardo_backer_deamon_internal_api_v1_requests.ScheduleConfig:
+    properties:
+      day:
+        description: Day of the month with Range 1-31
+        example: '*'
+        type: string
+      hour:
+        description: Range 0-23
+        example: "6"
+        type: string
+      minute:
+        description: Range 0-59
+        example: "0"
+        type: string
+      month:
+        description: Range 1-12
+        example: '*'
+        type: string
+      weekday:
+        description: Range 0-7 (Sun = 0 or 7)
+        example: "0"
+        type: string
+    required:
+    - day
+    - hour
+    - minute
+    - month
+    - weekday
+    type: object
+  github_com_lmriccardo_backer_deamon_internal_api_v1_requests.WebhookNotification:
+    properties:
+      events:
+        description: 'Subscribed Events: failure, success'
+        items:
+          $ref: '#/definitions/github_com_lmriccardo_backer_deamon_internal_domain.EventType'
+        type: array
+      headers:
+        additionalProperties:
+          type: string
+        description: Additional headers used for the requests
+        type: object
+      max_retries:
+        description: Maximum number of retries
+        minimum: 0
+        type: integer
+      name:
+        description: The name of the service (there can be duplicates)
+        type: string
+      timeout:
+        description: Timeout for receiving the response after sending the notification.
+        type: string
+      type:
+        allOf:
+        - $ref: '#/definitions/github_com_lmriccardo_backer_deamon_internal_domain.Webhook'
+        description: The type of the webhook service endpoint
+      url:
+        description: The endpoint URL of the service
+        type: string
+    required:
+    - name
+    - type
+    - url
+    type: object
+  github_com_lmriccardo_backer_deamon_internal_domain.EventType:
+    enum:
+    - failure
+    - success
+    type: string
+    x-enum-varnames:
+    - EventFailure
+    - EventSuccess
+  github_com_lmriccardo_backer_deamon_internal_domain.Webhook:
+    enum:
+    - discord
+    type: string
+    x-enum-varnames:
+    - WebhookDiscord
+  github_com_lmriccardo_backer_deamon_internal_platform_version.Info:
+    properties:
+      api:
+        type: integer
+      commit:
+        type: string
+      date:
+        type: string
+      go_version:
+        type: string
+      version:
+        type: string
+    type: object
+  internal_api.HealthzResponse:
+    properties:
+      ok:
+        type: boolean
+      version:
+        $ref: '#/definitions/github_com_lmriccardo_backer_deamon_internal_platform_version.Info'
+    type: object
+  internal_api_v1.BaseResponse:
+    properties:
+      errors:
+        description: Errors filled up only if failure
+        items:
+          type: string
+        type: array
+      message:
+        description: Message filled up only if success
+        type: string
+      status:
+        allOf:
+        - $ref: '#/definitions/internal_api_v1.StatusType'
+        description: Response status
+    type: object
+  internal_api_v1.CreateJobRequest:
+    properties:
+      log_retention:
+        allOf:
+        - $ref: '#/definitions/github_com_lmriccardo_backer_deamon_internal_api_v1_requests.LogRetentionCfg'
+        description: Log retention configuration
+      name:
+        description: The name of the target/job
+        example: full_backup
+        type: string
+      notification:
+        allOf:
+        - $ref: '#/definitions/github_com_lmriccardo_backer_deamon_internal_api_v1_requests.NotificationCfg'
+        description: Notification systems configuration
+      remote:
+        allOf:
+        - $ref: '#/definitions/github_com_lmriccardo_backer_deamon_internal_api_v1_requests.RemoteConfig'
+        description: The remote configuration
+      rsync:
+        allOf:
+        - $ref: '#/definitions/github_com_lmriccardo_backer_deamon_internal_api_v1_requests.RsyncConfig'
+        description: Rsync configuration options
+      schedule:
+        allOf:
+        - $ref: '#/definitions/github_com_lmriccardo_backer_deamon_internal_api_v1_requests.ScheduleConfig'
+        description: Job Schedule configuration
+    required:
+    - name
+    - remote
+    - rsync
+    - schedule
+    type: object
+  internal_api_v1.StatusType:
+    enum:
+    - 0
+    - 1
+    type: integer
+    x-enum-varnames:
+    - StatusSuccess
+    - StatusFailure
+info:
+  contact: {}
+  description: Backup automation daemon API
+  title: Backer API
+  version: "1.0"
+paths:
+  /healthz:
+    get:
+      description: Returns service health status and version
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_api.HealthzResponse'
+      summary: Health Check
+      tags:
+      - system
+  /v1/jobs/create:
+    post:
+      consumes:
+      - application/json
+      description: Request the registration of a new job
+      parameters:
+      - description: Job configuration
+        in: body
+        name: job
+        required: true
+        schema:
+          $ref: '#/definitions/internal_api_v1.CreateJobRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_api_v1.BaseResponse'
+        "400":
+          description: Validation Error
+          schema:
+            $ref: '#/definitions/internal_api_v1.BaseResponse'
+        "409":
+          description: Duplicate Job name
+          schema:
+            $ref: '#/definitions/internal_api_v1.BaseResponse'
+      summary: Job Create Request
+      tags:
+      - jobs
+  /version:
+    get:
+      description: Returns current running service and api version
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_lmriccardo_backer_deamon_internal_platform_version.Info'
+      summary: Get Service Version
+      tags:
+      - system
+swagger: "2.0"

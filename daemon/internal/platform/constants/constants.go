@@ -2,7 +2,6 @@ package constants
 
 const UNIX_SOCK_NAME = "backerd.sock" // The UNIX socket name
 const CRONTAB_TAG_PREFIX = "#backer:" // Default suffix used in crontab
-const LATEST_DB_VERSION = 2           // The latest db version
 
 type SMTP_Provider struct {
 	Hostname string // The hostname of the smtp domain

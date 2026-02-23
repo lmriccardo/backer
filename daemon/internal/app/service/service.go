@@ -1,9 +1,10 @@
-package core
+package service
 
 import (
 	"context"
 
-	"github.com/lmriccardo/backer/deamon/internal/core/ilock"
+	"github.com/lmriccardo/backer/deamon/internal/platform/ilock"
+	"github.com/lmriccardo/backer/deamon/internal/platform/utils"
 )
 
 type Service struct {
@@ -27,11 +28,11 @@ func NewService(ctx context.Context) (*Service, error) {
 	service := &Service{ctx: ctx, lock: instance_lock}
 
 	// Initialize the service with paths
-	if service.HomeDir, err = BackerHome(); err != nil {
+	if service.HomeDir, err = utils.BackerHome(); err != nil {
 		return nil, err
 	}
 
-	if service.LogDir, err = BackerLogHome(); err != nil {
+	if service.LogDir, err = utils.BackerLogHome(); err != nil {
 		return nil, err
 	}
 

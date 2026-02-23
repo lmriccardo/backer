@@ -1,4 +1,4 @@
-package core
+package domain
 
 import (
 	"encoding/json"
@@ -39,16 +39,22 @@ type Notification interface {
 
 type NotificationList []Notification
 
+type LogConfig struct {
+	Path            string `json:"path"`             // Path to the log folder
+	MaxSpareFiles   int    `json:"max_spare_files"`  // Maximum number of spare files
+	RetentionWindow int    `json:"retention_window"` // Maximum windows in days before removing some logs
+}
+
 type JobConfig struct {
 	Name        string           `json:"name"`         // The name of the job
-	Log         string           `json:"log"`          // Path to the log folder
+	Log         LogConfig        `json:"log"`          // Path to the log folder
 	Compression bool             `json:"compression"`  // Enable/Disable compression
 	Command     []string         `json:"command"`      // The command to run
 	Notify      NotificationList `json:"notification"` // Notification systems list
 }
 
 type EmailNotification struct {
-	ID       int              `json:"id"`
+	Id       int              `json:"id"`
 	Type     NotificationType `json:"type"` // "email"
 	From     string           `json:"from"`
 	To       []string         `json:"to"`
@@ -61,7 +67,7 @@ type EmailNotification struct {
 func (e *EmailNotification) Kind() string { return "email" }
 
 type WebhookNotification struct {
-	ID          int               `json:"id"`
+	Id          int               `json:"id"`
 	Type        NotificationType  `json:"type"`         // "webhook"
 	WebhookType Webhook           `json:"webhook_type"` // "discord"
 	Name        string            `json:"name"`
@@ -130,20 +136,6 @@ func (l *NotificationList) UnmarshalJSON(data []byte) error {
 
 	*l = out
 	return nil
-}
-
-// ToJson unmarshal the input string into the generic Type.
-// If the type is not marshable, or json encodable then it
-// returns an error.
-func ToJson[T any](jsonStr string) (T, error) {
-	var object T // Create the object of type T
-	err := json.Unmarshal([]byte(jsonStr), &object)
-	return object, err
-}
-
-func ToJsonWithObj[T any](dst *T, jsonStr string) error {
-	err := json.Unmarshal([]byte(jsonStr), dst)
-	return err
 }
 
 // This struct identify a single job.

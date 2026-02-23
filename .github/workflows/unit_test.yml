@@ -1,0 +1,43 @@
+name: Unit Tests
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - develop/*
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  # -----------------------------------------------------------
+  # GO DAEMON TESTS
+  # -----------------------------------------------------------
+  go-tests:
+    name: test (${{ matrix.os }}, go from go.mod)
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Already setted up for multiple OS
+        os: [ubuntu-latest]
+    
+    defaults:
+      run:
+        working-directory: daemon
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: daemon/go.mod
+          cache: true
+          cache-dependency-path: daemon/go.sum
+
+      - name: Run unit tests
+        run: go test -v ./test/... -count=1

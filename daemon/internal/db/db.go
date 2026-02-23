@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/lmriccardo/backer/deamon/internal/db/migrations"
 	_ "modernc.org/sqlite"
 )
 
@@ -57,9 +56,23 @@ func LoadFromPath(path string) (*sql.DB, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	if err := migrations.EnsureSchema(ctx, d); err != nil {
+	if err := EnsureSchema(ctx, d); err != nil {
 		return nil, err
 	}
 
 	return d, nil
+}
+
+func WithTx(db *sql.DB, ctx context.Context, fn func(tx *sql.Tx) error) error {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if err := fn(tx); err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }

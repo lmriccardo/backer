@@ -23,10 +23,10 @@ COMMIT 		:= $(shell git rev-parse --short HEAD 2>/dev/null || echo none)
 DATE 		:= $(shell date -u +%Y-%m-%d)
 GOVERSION 	:= $(shell go env GOVERSION)
 
-LDFLAGS := -X '$(MODULE)/internal/version.Version=$(VERSION)' \
-           -X '$(MODULE)/internal/version.Commit=$(COMMIT)' \
-           -X '$(MODULE)/internal/version.Date=$(DATE)' \
-           -X '$(MODULE)/internal/version.GoVersion=$(GOVERSION)'
+LDFLAGS := -X '$(MODULE)/internal/platform/version.Version=$(VERSION)' \
+           -X '$(MODULE)/internal/platform/version.Commit=$(COMMIT)' \
+           -X '$(MODULE)/internal/platform/version.Date=$(DATE)' \
+           -X '$(MODULE)/internal/platform/version.GoVersion=$(GOVERSION)'
 
 .PHONY: build run clean fmt lint test tidy dev help
 
