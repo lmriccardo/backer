@@ -47,15 +47,11 @@ func timeoutValidator(fl validator.FieldLevel) bool {
 func scheduleValidator(sl validator.StructLevel) {
 	s := sl.Current().Interface().(ScheduleConfig)
 
-	spec := fmt.Sprintf("%s %s %s %s %s",
-		s.Minute, s.Hour, s.Day, s.Month, s.Weekday,
-	)
-
 	parser := cron.NewParser(
 		cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow,
 	)
 
-	if _, err := parser.Parse(spec); err != nil {
+	if _, err := parser.Parse(s.String()); err != nil {
 		sl.ReportError(s, "ScheduleConfig", "schedule", "cron", err.Error())
 		return
 	}

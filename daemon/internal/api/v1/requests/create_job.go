@@ -1,6 +1,10 @@
 package requests
 
-import "github.com/lmriccardo/backer/deamon/internal/domain"
+import (
+	"fmt"
+
+	"github.com/lmriccardo/backer/deamon/internal/domain"
+)
 
 // JobCreateRequest is the body structure of the JSON data
 // for the POST http request to endpoint /jobs/create for
@@ -82,6 +86,12 @@ type ScheduleConfig struct {
 	Day     string `json:"day"     example:"*" binding:"required"` // Day of the month with Range 1-31
 	Hour    string `json:"hour"    example:"6" binding:"required"` // Range 0-23
 	Minute  string `json:"minute"  example:"0" binding:"required"` // Range 0-59
+}
+
+func (s *ScheduleConfig) String() string {
+	return fmt.Sprintf("%s %s %s %s %s",
+		s.Minute, s.Hour, s.Day, s.Month, s.Weekday,
+	)
 }
 
 // Custom SMTP server configuration

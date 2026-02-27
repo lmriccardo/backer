@@ -153,6 +153,8 @@ func createJob(job *apirequests.CreateJobRequest) (*domain.Job, error) {
 		RetentionWindow: job.LogRetention.Window,
 	}
 
+	job_config.Schedule = job.Schedule.String()
+
 	// 2. Create the rsync command
 	job_config.Command = createRsyncCommand(job)
 

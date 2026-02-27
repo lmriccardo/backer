@@ -3,6 +3,9 @@ package domain
 import (
 	"encoding/json"
 	"fmt"
+	"time"
+
+	"github.com/robfig/cron/v3"
 )
 
 type JobStatus int
@@ -51,6 +54,7 @@ type JobConfig struct {
 	Compression bool             `json:"compression"`  // Enable/Disable compression
 	Command     []string         `json:"command"`      // The command to run
 	Notify      NotificationList `json:"notification"` // Notification systems list
+	Schedule    string           `json:"schedule"`     // String schedule specification
 }
 
 type EmailNotification struct {
@@ -144,4 +148,14 @@ type Job struct {
 	Name   string    // The name of the job (unique as well)
 	Status JobStatus // The status of the current job (enabled/disabled)
 	Config JobConfig // Job configuration
+}
+
+func (j Job) Duration() time.Duration {
+	parser := cron.NewParser(
+		cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow,
+	)
+
+	schedule, _ := parser.Parse(j.Config.Schedule)
+	next := schedule.Next(time.Now())
+	return time.Until(next)
 }

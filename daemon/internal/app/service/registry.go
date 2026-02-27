@@ -31,6 +31,8 @@ var REGISTRY_STATEMENTS = map[RegistryStatementType]string{
 	InsertNewJob:       `INSERT INTO jobs(name, enabled, config_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
 }
 
+const NOF_WORKERS_DEFAULT = 4
+
 type IRegistry interface {
 	// ListJobs list all jobs corresponding to the input status
 	ListJobs(ctx context.Context, status domain.JobStatus, tx *sql.Tx) ([]domain.Job, error)
@@ -43,14 +45,17 @@ type IRegistry interface {
 }
 
 type Registry struct {
-	db         *sql.DB         // The registry database
-	path       string          // The path to the file database
-	ctx        context.Context // Interrupt context
-	statements StatementsMap   // Map of prepared statements
+	utils.TickeringRoaster[domain.Job]
+
+	db          *sql.DB         // The registry database
+	path        string          // The path to the file database
+	ctx         context.Context // Interrupt context
+	statements  StatementsMap   // Map of prepared statements
+	jobsToIndex map[string]int  // Maps jobs name to index
 }
 
 func NewRegistry(ctx context.Context) (*Registry, error) {
-	r := &Registry{ctx: ctx, statements: StatementsMap{}}
+	r := &Registry{ctx: ctx, statements: StatementsMap{}, jobsToIndex: map[string]int{}}
 
 	// Get the path of the registry file
 	var err error
@@ -59,7 +64,7 @@ func NewRegistry(ctx context.Context) (*Registry, error) {
 	}
 
 	// Initialize the registry
-	if err := r.initDb(); err != nil {
+	if err := r.initRegistry(); err != nil {
 		return nil, err
 	}
 
@@ -68,17 +73,57 @@ func NewRegistry(ctx context.Context) (*Registry, error) {
 
 func NewInMemRegistry(ctx context.Context) (*Registry, error) {
 	r := &Registry{
-		path:       "file::memory:?cache=shared&_fk=1",
-		ctx:        ctx,
-		statements: StatementsMap{},
+		path:        "file::memory:?cache=shared&_fk=1",
+		ctx:         ctx,
+		statements:  StatementsMap{},
+		jobsToIndex: map[string]int{},
 	}
 
 	// Initialize the registry
-	if err := r.initDb(); err != nil {
+	if err := r.initRegistry(); err != nil {
 		return nil, err
 	}
 
 	return r, nil
+}
+
+func (r *Registry) initRegistry() error {
+	// Initialize the task roaster embedded structure
+	r.TickeringRoaster = *utils.NewTickeringRoaster[domain.Job](
+		r.ctx, NOF_WORKERS_DEFAULT,
+	)
+
+	// Initialize the registry
+	if err := r.initDb(); err != nil {
+		return err
+	}
+
+	// Load all the jobs from the registry
+	if err := r.loadJobs(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *Registry) pushJob(job *domain.Job) {
+	r.jobsToIndex[job.Name] = r.Size()
+	r.Push(job)
+}
+
+func (r *Registry) loadJobs() error {
+	// Loads the jobs from the registry DB
+	jobs, err := r.ListJobs(context.Background(), domain.JobStatusAll, nil)
+	if err != nil {
+		return err
+	}
+
+	// Put each loaded job into the roaster and the mapping
+	for _, job := range jobs {
+		r.pushJob(&job)
+	}
+
+	return nil
 }
 
 func (r *Registry) prepareStatements() error {
@@ -233,6 +278,9 @@ func (r *Registry) CreateJob(ctx context.Context, job *apirequests.CreateJobRequ
 			fmt.Sprintf("unable to insert new job %v", job.Name),
 		)
 	}
+
+	// 4. Pushes the job into the task roaster for execution
+	r.pushJob(registry_job)
 
 	return nil
 }
