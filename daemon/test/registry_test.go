@@ -30,7 +30,7 @@ var reg *service.Registry = nil
 // This function ensures that the registry is always created. If an
 // error occur when the registry is created then it fails immediately
 func mustNewRegistry(t *testing.T) *service.Registry {
-	reg, err := service.NewInMemRegistry(context.Background())
+	reg, err := service.NewInMemRegistry(context.Background(), 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,7 +132,7 @@ func TestMigrations(t *testing.T) {
 		cancel()
 	}()
 
-	if _, err := service.NewRegistry(ctx); err != nil {
+	if _, err := service.NewRegistry(ctx, 0); err != nil {
 		t.Error(err)
 	}
 }

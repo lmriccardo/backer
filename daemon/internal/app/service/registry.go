@@ -42,10 +42,11 @@ type IRegistry interface {
 
 	// Clean up the entire registry
 	Close()
+	GetTaskChannel() <-chan *domain.Job
 }
 
 type Registry struct {
-	utils.TickeringRoaster[domain.Job]
+	*utils.TickeringRoaster[domain.Job]
 
 	db          *sql.DB         // The registry database
 	path        string          // The path to the file database
@@ -54,7 +55,7 @@ type Registry struct {
 	jobsToIndex map[string]int  // Maps jobs name to index
 }
 
-func NewRegistry(ctx context.Context) (*Registry, error) {
+func NewRegistry(ctx context.Context, nWorkers int) (*Registry, error) {
 	r := &Registry{ctx: ctx, statements: StatementsMap{}, jobsToIndex: map[string]int{}}
 
 	// Get the path of the registry file
@@ -64,14 +65,14 @@ func NewRegistry(ctx context.Context) (*Registry, error) {
 	}
 
 	// Initialize the registry
-	if err := r.initRegistry(); err != nil {
+	if err := r.initRegistry(nWorkers); err != nil {
 		return nil, err
 	}
 
 	return r, nil
 }
 
-func NewInMemRegistry(ctx context.Context) (*Registry, error) {
+func NewInMemRegistry(ctx context.Context, nWorkers int) (*Registry, error) {
 	r := &Registry{
 		path:        "file::memory:?cache=shared&_fk=1",
 		ctx:         ctx,
@@ -80,18 +81,21 @@ func NewInMemRegistry(ctx context.Context) (*Registry, error) {
 	}
 
 	// Initialize the registry
-	if err := r.initRegistry(); err != nil {
+	if err := r.initRegistry(nWorkers); err != nil {
 		return nil, err
 	}
 
 	return r, nil
 }
 
-func (r *Registry) initRegistry() error {
+func (r *Registry) initRegistry(nWorkers int) error {
 	// Initialize the task roaster embedded structure
-	r.TickeringRoaster = *utils.NewTickeringRoaster[domain.Job](
-		r.ctx, NOF_WORKERS_DEFAULT,
-	)
+	r.TickeringRoaster = nil
+	if nWorkers > 0 {
+		r.TickeringRoaster = utils.NewTickeringRoaster[domain.Job](
+			r.ctx, NOF_WORKERS_DEFAULT,
+		)
+	}
 
 	// Initialize the registry
 	if err := r.initDb(); err != nil {
@@ -119,8 +123,10 @@ func (r *Registry) loadJobs() error {
 	}
 
 	// Put each loaded job into the roaster and the mapping
-	for _, job := range jobs {
-		r.pushJob(&job)
+	if r.TickeringRoaster != nil {
+		for _, job := range jobs {
+			r.pushJob(&job)
+		}
 	}
 
 	return nil
@@ -280,7 +286,9 @@ func (r *Registry) CreateJob(ctx context.Context, job *apirequests.CreateJobRequ
 	}
 
 	// 4. Pushes the job into the task roaster for execution
-	r.pushJob(registry_job)
+	if r.TickeringRoaster != nil {
+		r.pushJob(registry_job)
+	}
 
 	return nil
 }
@@ -290,4 +298,8 @@ func (r *Registry) Close() {
 		v.Close()
 	}
 	r.db.Close()
+}
+
+func (r *Registry) GetTaskChannel() <-chan *domain.Job {
+	return r.TickeringRoaster.RChannel()
 }

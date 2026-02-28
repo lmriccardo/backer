@@ -17,7 +17,7 @@ type Service struct {
 	lock *ilock.InstanceLock
 }
 
-func NewService(ctx context.Context) (*Service, error) {
+func NewService(ctx context.Context, nWorkers int) (*Service, error) {
 	var err error
 
 	instance_lock, err := ilock.NewInstanceLock(ilock.LOCK_NAME)
@@ -37,7 +37,7 @@ func NewService(ctx context.Context) (*Service, error) {
 	}
 
 	// Initialize the registry
-	if service.IRegistry, err = NewRegistry(ctx); err != nil {
+	if service.IRegistry, err = NewRegistry(ctx, nWorkers); err != nil {
 		return nil, err
 	}
 

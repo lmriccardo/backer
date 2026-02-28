@@ -2,6 +2,7 @@ package constants
 
 const UNIX_SOCK_NAME = "backerd.sock" // The UNIX socket name
 const CRONTAB_TAG_PREFIX = "#backer:" // Default suffix used in crontab
+const NOF_WORKERS_DEFAULT = 4         // Number of default workers for running jobs
 
 type SMTP_Provider struct {
 	Hostname string // The hostname of the smtp domain
