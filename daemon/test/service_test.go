@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/lmriccardo/backer/deamon/internal/app/service"
+	"github.com/lmriccardo/backer/deamon/internal/core/service"
 	"github.com/lmriccardo/backer/deamon/internal/platform/utils"
 	"github.com/stretchr/testify/require"
 )

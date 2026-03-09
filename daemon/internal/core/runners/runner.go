@@ -5,17 +5,18 @@ import (
 	"log"
 	"sync"
 
-	"github.com/lmriccardo/backer/deamon/internal/domain"
+	"github.com/lmriccardo/backer/deamon/internal/core/domain"
 )
 
 type BackerRunner struct {
-	ch  <-chan *domain.Job // Read-only channel for getting jobs to run
-	ctx context.Context    // Shutdown context
-	wg  *sync.WaitGroup    // Runner wait group from the engine
+	ch  <-chan *domain.JobRun // Read-only channel for getting jobs to run
+	rch chan<- *domain.JobRun // Write-only channel for pushing jobs run
+	ctx context.Context       // Shutdown context
+	wg  *sync.WaitGroup       // Runner wait group from the engine
 }
 
 func NewBackerRunner(
-	ctx context.Context, ch <-chan *domain.Job, wg *sync.WaitGroup,
+	ctx context.Context, ch <-chan *domain.JobRun, wg *sync.WaitGroup,
 ) *BackerRunner {
 	runner := &BackerRunner{ch: ch, ctx: ctx, wg: wg}
 	return runner
@@ -38,7 +39,14 @@ func (b *BackerRunner) Run() {
 				return
 			}
 
-			b.exec(job)
+			// Set its status to running and execute the task
+			job.Status = domain.RunStatusRunning
+			b.exec(job.Job)
+
+			// Set its status to completed and push it back into the
+			// communication channel with the registry.
+			job.Status = domain.RunStatusCompleted
+			b.rch <- job
 		}
 	}
 }
@@ -52,7 +60,7 @@ type RunningEngine struct {
 	wg      sync.WaitGroup     // Waiting group for synchronizing runner exit
 }
 
-func NewRunningEngine(ctx context.Context, nWorkers int, ch <-chan *domain.Job) *RunningEngine {
+func NewRunningEngine(ctx context.Context, nWorkers int, ch <-chan *domain.JobRun) *RunningEngine {
 	engine := &RunningEngine{runners: []*BackerRunner{}, ctx: ctx}
 
 	// Create all the runners
@@ -64,6 +72,12 @@ func NewRunningEngine(ctx context.Context, nWorkers int, ch <-chan *domain.Job) 
 	}
 
 	return engine
+}
+
+func (e *RunningEngine) SetRunChannel(ch chan<- *domain.JobRun) {
+	for _, runner := range e.runners {
+		runner.rch = ch
+	}
 }
 
 func (e *RunningEngine) Run() {

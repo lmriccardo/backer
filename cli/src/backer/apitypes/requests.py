@@ -195,3 +195,10 @@ class JobsConfiguration(BaseModel):
     backup: BackupCfg
 
 ROOT_SCHEMA_CLASS = JobsConfiguration # For schema generation
+
+class JobRunRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    
+    dry_run : bool
+    notify  : bool
+    log     : bool

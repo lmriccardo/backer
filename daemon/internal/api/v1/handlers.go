@@ -6,7 +6,8 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/lmriccardo/backer/deamon/internal/app/service"
+	"github.com/lmriccardo/backer/deamon/internal/api/v1/requests"
+	"github.com/lmriccardo/backer/deamon/internal/core/service"
 	"github.com/lmriccardo/backer/deamon/internal/platform/utils"
 )
 
@@ -29,13 +30,14 @@ func HandleListJobs(ctx *gin.Context, srv *service.Service) {
 // @Success 200 {object} BaseResponse
 // @Failure 400 {object} BaseResponse "Validation Error"
 // @Failure 409 {object} BaseResponse "Duplicate Job name"
+// @Failure 501 {object} BaseResponse "Internal Server Error (most likely db fault)"
 // @Router /v1/jobs/create [post]
 func HandleJobCreateRequest(ctx *gin.Context, srv *service.Service) {
 	// Binds the request body to the request structure and applies
 	// defaults where necessary
 	log.Println("[NEW REQUEST] Received new job creation request")
 
-	var req CreateJobRequest
+	var req requests.CreateJobRequest
 	if err := utils.MustBindWithJSON(&req, ctx.Request); err != nil {
 		ctx.JSON(http.StatusBadRequest, NewErrorResponseFromErrs(err))
 		return
@@ -51,10 +53,7 @@ func HandleJobCreateRequest(ctx *gin.Context, srv *service.Service) {
 	if err := srv.CreateJob(ctx.Request.Context(), &req, nil); err != nil {
 		// If the error returned by the function regards the job
 		// with that name already existing, then we need to return 409
-		status_code := http.StatusBadRequest
-		if _, ok := err.(*service.DuplicateJobNameError); ok {
-			status_code = http.StatusConflict
-		}
+		status_code := GetCodeFromError(err)
 		ctx.JSON(status_code, NewErrorResponseFromErrs(err))
 		return
 	}
@@ -63,11 +62,44 @@ func HandleJobCreateRequest(ctx *gin.Context, srv *service.Service) {
 	ctx.JSON(http.StatusCreated, NewSuccessResponse(msg))
 }
 
+// @Summary Job Run Request
+// @Description Request the execution of the job with given name
+// @Tags jobs
+// @Accept json
+// @Produce json
+// @Param job body RunJobRequest true "Job execution, notification and logging configuration"
+// @Success 200 {object} BaseResponse
+// @Failure 404 {object} BaseResponse "Job Not Found with given name"
+// @Failure 501 {object} BaseResponse "Generic Internal Server Error"
+// @Router /v1/jobs/:name/run [post]
+func HandleRunJobRequest(ctx *gin.Context, srv *service.Service) {
+	// Take the job name from the api parameters
+	job_name := ctx.Params.ByName("name")
+	log.Printf("[NEW REQUEST] Received new job running request for: %s\n", job_name)
+
+	// Bind the JSON payload from the request to the struct
+	req := requests.RunJobRequest{Name: job_name}
+	if err := utils.MustBindWithJSON(&req, ctx.Request); err != nil {
+		ctx.JSON(http.StatusBadRequest, NewErrorResponseFromErrs(err))
+		return
+	}
+
+	// Request the service to enqueue the job to run
+	_, err := srv.RunJob(ctx.Request.Context(), &req, nil)
+	if err != nil {
+		status_code := GetCodeFromError(err)
+		ctx.JSON(status_code, NewErrorResponseFromErrs(err))
+		return
+	}
+}
+
 // RegisterHandlers registers v1 handlers
 func RegisterHandlers(rg *gin.RouterGroup, srv *service.Service) {
 	_ = RegisterValidators() // Registers all validators
 
-	rg.Group("/v1").Group("/jobs").
+	grp := rg.Group("/v1")
+	grp.Group("/jobs").
 		GET("/", WrapHandler(srv, HandleListJobs)).
-		POST("/create", WrapHandler(srv, HandleJobCreateRequest))
+		POST("/create", WrapHandler(srv, HandleJobCreateRequest)).
+		POST("/:name/run", WrapHandler(srv, HandleRunJobRequest))
 }

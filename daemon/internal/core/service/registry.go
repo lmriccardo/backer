@@ -8,8 +8,8 @@ import (
 	"time"
 
 	apirequests "github.com/lmriccardo/backer/deamon/internal/api/v1/requests"
+	"github.com/lmriccardo/backer/deamon/internal/core/domain"
 	"github.com/lmriccardo/backer/deamon/internal/db"
-	"github.com/lmriccardo/backer/deamon/internal/domain"
 	"github.com/lmriccardo/backer/deamon/internal/platform/utils"
 	_ "modernc.org/sqlite"
 )
@@ -39,24 +39,27 @@ type IRegistry interface {
 	CreateJob(ctx context.Context, job *apirequests.CreateJobRequest, tx *sql.Tx) error
 	GetJob(ctx context.Context, name string, tx *sql.Tx) (*domain.Job, error)
 	SearchJobByName(ctx context.Context, name string, tx *sql.Tx) (bool, error)
+	RunJob(ctx context.Context, req *apirequests.RunJobRequest, tx *sql.Tx) (*domain.Run, error)
 
 	// Clean up the entire registry
 	Close()
-	GetTaskChannel() <-chan *domain.Job
+	GetTaskChannel() <-chan *domain.JobRun
+	SetRunChannel(ch <-chan *domain.JobRun)
 }
 
 type Registry struct {
-	*utils.TickeringRoaster[domain.Job]
+	*TickeringRoaster
 
-	db          *sql.DB         // The registry database
-	path        string          // The path to the file database
-	ctx         context.Context // Interrupt context
-	statements  StatementsMap   // Map of prepared statements
-	jobsToIndex map[string]int  // Maps jobs name to index
+	db         *sql.DB                   // The registry database
+	path       string                    // The path to the file database
+	ctx        context.Context           // Interrupt context
+	statements StatementsMap             // Map of prepared statements
+	runCh      <-chan *domain.JobRun     // Channel for reading job runs
+	pendRuns   map[string]*domain.JobRun // Maps with one shot pending runs (not stored into the roaster)
 }
 
 func NewRegistry(ctx context.Context, nWorkers int) (*Registry, error) {
-	r := &Registry{ctx: ctx, statements: StatementsMap{}, jobsToIndex: map[string]int{}}
+	r := &Registry{ctx: ctx, statements: StatementsMap{}}
 
 	// Get the path of the registry file
 	var err error
@@ -74,10 +77,9 @@ func NewRegistry(ctx context.Context, nWorkers int) (*Registry, error) {
 
 func NewInMemRegistry(ctx context.Context, nWorkers int) (*Registry, error) {
 	r := &Registry{
-		path:        "file::memory:?cache=shared&_fk=1",
-		ctx:         ctx,
-		statements:  StatementsMap{},
-		jobsToIndex: map[string]int{},
+		path:       "file::memory:?cache=shared&_fk=1",
+		ctx:        ctx,
+		statements: StatementsMap{},
 	}
 
 	// Initialize the registry
@@ -92,9 +94,7 @@ func (r *Registry) initRegistry(nWorkers int) error {
 	// Initialize the task roaster embedded structure
 	r.TickeringRoaster = nil
 	if nWorkers > 0 {
-		r.TickeringRoaster = utils.NewTickeringRoaster[domain.Job](
-			r.ctx, NOF_WORKERS_DEFAULT,
-		)
+		r.TickeringRoaster = NewTickeringRoaster(r.ctx, nWorkers)
 	}
 
 	// Initialize the registry
@@ -107,12 +107,11 @@ func (r *Registry) initRegistry(nWorkers int) error {
 		return err
 	}
 
-	return nil
-}
+	// Starts the goroutine for handling completed runs pushed
+	// into the channel by all runners
+	go r.handleCompletedRuns()
 
-func (r *Registry) pushJob(job *domain.Job) {
-	r.jobsToIndex[job.Name] = r.Size()
-	r.Push(job)
+	return nil
 }
 
 func (r *Registry) loadJobs() error {
@@ -125,7 +124,7 @@ func (r *Registry) loadJobs() error {
 	// Put each loaded job into the roaster and the mapping
 	if r.TickeringRoaster != nil {
 		for _, job := range jobs {
-			r.pushJob(&job)
+			r.Push(&job)
 		}
 	}
 
@@ -162,17 +161,34 @@ func (r *Registry) initDb() error {
 	return nil
 }
 
-// WithTx provides a transaction wrapper. Every operation perform by the input
-// function is than rolled back to the previous state. Returns an error if any.
-func (r *Registry) WithTx(ctx context.Context, fn func(*sql.Tx) error) error {
-	return db.WithTx(r.db, ctx, fn)
-}
-
 func (r *Registry) bindStatementToTx(ctx context.Context, tx *sql.Tx, t RegistryStatementType) *sql.Stmt {
 	if tx != nil {
 		return tx.StmtContext(ctx, r.statements[t])
 	}
 	return r.statements[t]
+}
+
+func (r *Registry) handleCompletedRuns() {
+	for {
+		select {
+		case <-r.ctx.Done():
+			return
+		case run, ok := <-r.runCh:
+			if !ok {
+				return
+			}
+
+			log.Printf("Completed run with Id %s", run.Id)
+
+			// Save the run into the database
+		}
+	}
+}
+
+// WithTx provides a transaction wrapper. Every operation perform by the input
+// function is than rolled back to the previous state. Returns an error if any.
+func (r *Registry) WithTx(ctx context.Context, fn func(*sql.Tx) error) error {
+	return db.WithTx(r.db, ctx, fn)
 }
 
 func (r *Registry) ListJobs(ctx context.Context, status domain.JobStatus, tx *sql.Tx) ([]domain.Job, error) {
@@ -287,19 +303,43 @@ func (r *Registry) CreateJob(ctx context.Context, job *apirequests.CreateJobRequ
 
 	// 4. Pushes the job into the task roaster for execution
 	if r.TickeringRoaster != nil {
-		r.pushJob(registry_job)
+		r.Push(registry_job)
 	}
 
 	return nil
 }
 
+func (r *Registry) RunJob(ctx context.Context, req *apirequests.RunJobRequest, tx *sql.Tx) (*domain.Run, error) {
+	// First we need to check that the job actually exists
+	_, ok := r.GetTaskIndex(req.Name)
+	if !ok {
+		return nil, NewInvalidJobNameError(req.Name)
+	}
+
+	// If the job exists than we can create the run task and push into the channel
+	job, _ := r.GetTask(req.Name)
+	job.Name = fmt.Sprintf("%s_ONESHOT", job.Name)
+	task := r.CreateJobRunTask(job, req.DryRun, true)
+	r.ready <- task
+
+	return nil, nil
+}
+
 func (r *Registry) Close() {
+	// Close all the open statements and the database
 	for _, v := range r.statements {
 		v.Close()
 	}
 	r.db.Close()
+
+	// Close the write channel for jobs
+	r.TickeringRoaster.Close()
 }
 
-func (r *Registry) GetTaskChannel() <-chan *domain.Job {
+func (r *Registry) GetTaskChannel() <-chan *domain.JobRun {
 	return r.TickeringRoaster.RChannel()
+}
+
+func (r *Registry) SetRunChannel(ch <-chan *domain.JobRun) {
+	r.runCh = ch
 }

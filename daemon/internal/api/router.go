@@ -5,7 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	v1 "github.com/lmriccardo/backer/deamon/internal/api/v1"
-	"github.com/lmriccardo/backer/deamon/internal/app/service"
+	"github.com/lmriccardo/backer/deamon/internal/core/service"
 	"github.com/lmriccardo/backer/deamon/internal/platform/version"
 )
 

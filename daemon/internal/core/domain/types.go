@@ -159,3 +159,42 @@ func (j Job) Duration() time.Duration {
 	next := schedule.Next(time.Now())
 	return time.Until(next)
 }
+
+type RunStatus int
+
+const (
+	RunStatusWaiting RunStatus = iota
+	RunStatusRunning
+	RunStatusCompleted
+)
+
+func (r RunStatus) String() string {
+	switch r {
+	case RunStatusWaiting:
+		return "waiting"
+	case RunStatusRunning:
+		return "running"
+	case RunStatusCompleted:
+		return "completed"
+	default:
+		return "unknown"
+	}
+}
+
+type Run struct {
+	Id      string    // The Id of the run
+	Status  RunStatus // Current status of the run
+	JobName string    // Name of the job of the current run
+	DryRun  bool      // If the run is a dry-run
+	OneShot bool      // If this run is one shot or not
+}
+
+type JobRun struct {
+	Run
+
+	Job *Job // Job of the current run
+}
+
+func (r JobRun) Duration() time.Duration {
+	return r.Job.Duration()
+}

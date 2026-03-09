@@ -18,8 +18,7 @@ import (
 
 	"github.com/lmriccardo/backer/deamon/docs"
 	"github.com/lmriccardo/backer/deamon/internal/api"
-	"github.com/lmriccardo/backer/deamon/internal/app/runners"
-	"github.com/lmriccardo/backer/deamon/internal/app/service"
+	"github.com/lmriccardo/backer/deamon/internal/core"
 	"github.com/lmriccardo/backer/deamon/internal/platform/constants"
 	"github.com/lmriccardo/backer/deamon/internal/platform/version"
 	"github.com/lmriccardo/backer/deamon/internal/transport"
@@ -37,13 +36,10 @@ func main() {
 
 	defer stop()
 
-	// First create the route engine for the REST API
-	service, err := service.NewService(ctx, constants.NOF_WORKERS_DEFAULT)
-	if err != nil {
-		log.Fatalf("when creating the service: %v", err)
-	}
-
-	engine := api.NewEngine(service)
+	// Create the Service Engine for the application to work. The service
+	// engine comprehends both the runner engine and the service/registry
+	sEngine := core.NewServiceEngine(ctx, constants.NOF_WORKERS_DEFAULT)
+	engine := api.NewEngine(sEngine.Service)
 
 	// Then create the server listener based on the current OS
 	t, err := transport.NewTransport()
@@ -59,11 +55,6 @@ func main() {
 
 	// Runs the server documentation
 	docsrv := docs.RunDocsServer("127.0.0.1:8081", serverErr)
-
-	// Create all the runners with the running engine
-	rChannel := service.IRegistry.GetTaskChannel()
-	rEngine := runners.NewRunningEngine(ctx, constants.NOF_WORKERS_DEFAULT, rChannel)
-	rEngine.Run()
 
 	go func() {
 		log.Printf("Listening on %s\n", t.Uri())
@@ -99,8 +90,7 @@ func main() {
 	_ = srv.Shutdown(sdwnCtx)    // stops HTTP, drains requests
 	_ = docsrv.Shutdown(sdwnCtx) // Stop the HTTP Documentation server
 	t.Close()                    // cleanup (listener close + unlink etc.)
-	service.Close()              // Cleanup the service
-	rEngine.Stop()               // Stop the runner engine
+	sEngine.Close()              // Stop the service engine
 
 	// Wait for Serve goroutine to finish before exiting main
 	if err := <-serverErr; err != nil {

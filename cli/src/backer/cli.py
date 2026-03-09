@@ -57,6 +57,14 @@ def def_jobs_command(parser: argparse._SubParsersAction) -> None:
     create_parser.add_argument("config", help="YAML configuration file")
     create_parser.set_defaults(func=jobsfn.handle_jobs_create)
 
+    # Jobs run command
+    run_parser = jobs_subparser.add_parser("run", help="Run a job")
+    run_parser.add_argument("job_name", help="The name of the job to run")
+    run_parser.add_argument("--no-wait", help="Does not block the caller for run completition", action="store_true")
+    run_parser.add_argument("--dry-run", help="Enable dry run mode", action="store_true")
+    run_parser.add_argument("--notify", help="Enable notification", action="store_true")
+    run_parser.add_argument("--log", help="Enable logging", action="store_true")
+
 async def async_main() -> int:
     parser = argparse.ArgumentParser(prog="backer", description="Backup automation control tool")
     subparsers = parser.add_subparsers(dest="command")

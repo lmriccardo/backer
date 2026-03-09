@@ -69,6 +69,7 @@ class Endpoints:
 
     __Jobs      = Endpoint("/jobs", HttpMethod.GET)
     __CreateJob = Endpoint("/create", HttpMethod.POST)
+    __RunJob    = Endpoint("/run", HttpMethod.POST)
 
     _Root   = Endpoint("/api")
     Version = _Root / Endpoint("/version", HttpMethod.GET, __Version_Models)
@@ -84,6 +85,8 @@ class Endpoints:
     def Jobs(self) -> Endpoint: return self._RootVers / self.__Jobs
     @property
     def CreateJob(self) -> Endpoint: return self.Jobs / self.__CreateJob
+    
+    def RunJob(self, jn: str) -> Endpoint: return self.Jobs / jn / self.__RunJob
 
 @dataclass(frozen=True)
 class _Response[_T]:

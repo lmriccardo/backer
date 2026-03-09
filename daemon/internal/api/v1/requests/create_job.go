@@ -3,7 +3,7 @@ package requests
 import (
 	"fmt"
 
-	"github.com/lmriccardo/backer/deamon/internal/domain"
+	"github.com/lmriccardo/backer/deamon/internal/core/domain"
 )
 
 // JobCreateRequest is the body structure of the JSON data

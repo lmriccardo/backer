@@ -1,6 +1,11 @@
 package v1
 
-import "github.com/lmriccardo/backer/deamon/internal/platform/utils"
+import (
+	"net/http"
+
+	"github.com/lmriccardo/backer/deamon/internal/core/service"
+	"github.com/lmriccardo/backer/deamon/internal/platform/utils"
+)
 
 type StatusType int
 
@@ -29,4 +34,22 @@ func NewErrorResponseFromErrs(errs ...error) BaseResponse {
 
 func NewSuccessResponse(msg string) BaseResponse {
 	return BaseResponse{Status: StatusSuccess, Message: msg}
+}
+
+// GetCodeFromError maps custom service errors to known http
+// status for responses. On default or unknown errors,
+// status bad request is used.
+func GetCodeFromError(err error) int {
+	switch err.(type) {
+	case *service.DuplicateJobNameError:
+		return http.StatusConflict
+	case *service.InvalidJobNameError:
+		return http.StatusNotFound
+	case *service.ConfigurationError:
+		return http.StatusBadRequest
+	case *service.DatabaseError:
+		return http.StatusInternalServerError
+	default:
+		return http.StatusBadRequest
+	}
 }

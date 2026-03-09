@@ -7,7 +7,8 @@ import (
 
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
-	"github.com/lmriccardo/backer/deamon/internal/domain"
+	"github.com/lmriccardo/backer/deamon/internal/api/v1/requests"
+	"github.com/lmriccardo/backer/deamon/internal/core/domain"
 	"github.com/robfig/cron/v3"
 )
 
@@ -21,8 +22,8 @@ func validateEnum[T comparable](fl validator.FieldLevel, value ...T) bool {
 }
 
 func deleteModeValidator(fl validator.FieldLevel) bool {
-	return validateEnum(fl, DeleteBegin, DeleteAfter,
-		DeleteDelay, DeleteDuring, DeleteExcluded,
+	return validateEnum(fl, requests.DeleteBegin, requests.DeleteAfter,
+		requests.DeleteDelay, requests.DeleteDuring, requests.DeleteExcluded,
 	)
 }
 
@@ -45,7 +46,7 @@ func timeoutValidator(fl validator.FieldLevel) bool {
 }
 
 func scheduleValidator(sl validator.StructLevel) {
-	s := sl.Current().Interface().(ScheduleConfig)
+	s := sl.Current().Interface().(requests.ScheduleConfig)
 
 	parser := cron.NewParser(
 		cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow,
@@ -85,7 +86,7 @@ func RegisterValidators() error {
 	}
 
 	// Registers struct level validators
-	v.RegisterStructValidation(scheduleValidator, ScheduleConfig{})
+	v.RegisterStructValidation(scheduleValidator, requests.ScheduleConfig{})
 
 	return nil
 }
