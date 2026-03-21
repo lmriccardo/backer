@@ -17,9 +17,9 @@ type RunJobRequest struct {
 type RunJobResponse struct {
 	BaseResponse // It is a base reponse
 
-	RunId   string // The Id of the run
-	JobName string // The name of the job
-	Status  string // The current status of the run
+	RunId   string `json:"run_id"`   // The Id of the run
+	JobName string `json:"job_name"` // The name of the job
+	Status  string `json:"status"`   // The current status of the run
 }
 
 func NewRunJobResponse(run *domain.Run) RunJobResponse {

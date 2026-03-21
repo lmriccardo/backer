@@ -26,7 +26,7 @@ func HandleListJobs(ctx *gin.Context, srv *service.Service) {
 // @Tags jobs
 // @Accept json
 // @Produce json
-// @Param job body CreateJobRequest true "Job configuration"
+// @Param job body proto.CreateJobRequest true "Job configuration"
 // @Success 200 {object} proto.BaseResponse
 // @Failure 400 {object} proto.BaseResponse "Validation Error"
 // @Failure 409 {object} proto.BaseResponse "Duplicate Job name"
@@ -67,7 +67,7 @@ func HandleJobCreateRequest(ctx *gin.Context, srv *service.Service) {
 // @Tags jobs
 // @Accept json
 // @Produce json
-// @Param job body RunJobRequest true "Job execution, notification and logging configuration"
+// @Param job body proto.RunJobRequest true "Job execution, notification and logging configuration"
 // @Success 202 {object} proto.RunJobResponse "Job execution accepted and queued"
 // @Failure 404 {object} proto.BaseResponse "Job Not Found with given name"
 // @Failure 501 {object} proto.BaseResponse "Generic Internal Server Error"
