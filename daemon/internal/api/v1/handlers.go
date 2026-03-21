@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/lmriccardo/backer/deamon/internal/api/v1/requests"
+	"github.com/lmriccardo/backer/deamon/internal/api/v1/proto"
 	"github.com/lmriccardo/backer/deamon/internal/core/service"
 	"github.com/lmriccardo/backer/deamon/internal/platform/utils"
 )
@@ -27,25 +27,25 @@ func HandleListJobs(ctx *gin.Context, srv *service.Service) {
 // @Accept json
 // @Produce json
 // @Param job body CreateJobRequest true "Job configuration"
-// @Success 200 {object} BaseResponse
-// @Failure 400 {object} BaseResponse "Validation Error"
-// @Failure 409 {object} BaseResponse "Duplicate Job name"
-// @Failure 501 {object} BaseResponse "Internal Server Error (most likely db fault)"
+// @Success 200 {object} proto.BaseResponse
+// @Failure 400 {object} proto.BaseResponse "Validation Error"
+// @Failure 409 {object} proto.BaseResponse "Duplicate Job name"
+// @Failure 501 {object} proto.BaseResponse "Internal Server Error (most likely db fault)"
 // @Router /v1/jobs/create [post]
 func HandleJobCreateRequest(ctx *gin.Context, srv *service.Service) {
 	// Binds the request body to the request structure and applies
 	// defaults where necessary
 	log.Println("[NEW REQUEST] Received new job creation request")
 
-	var req requests.CreateJobRequest
+	var req proto.CreateJobRequest
 	if err := utils.MustBindWithJSON(&req, ctx.Request); err != nil {
-		ctx.JSON(http.StatusBadRequest, NewErrorResponseFromErrs(err))
+		ctx.JSON(http.StatusBadRequest, proto.NewErrorResponseFromErrs(err))
 		return
 	}
 
 	// Validates the request payload using internal gin validator
 	if ok, errs := ValidateRequest(req); !ok {
-		ctx.JSON(http.StatusBadRequest, NewErrorResponseFromErrs(errs...))
+		ctx.JSON(http.StatusBadRequest, proto.NewErrorResponseFromErrs(errs...))
 		return
 	}
 
@@ -53,13 +53,13 @@ func HandleJobCreateRequest(ctx *gin.Context, srv *service.Service) {
 	if err := srv.CreateJob(ctx.Request.Context(), &req, nil); err != nil {
 		// If the error returned by the function regards the job
 		// with that name already existing, then we need to return 409
-		status_code := GetCodeFromError(err)
-		ctx.JSON(status_code, NewErrorResponseFromErrs(err))
+		status_code := proto.GetCodeFromError(err)
+		ctx.JSON(status_code, proto.NewErrorResponseFromErrs(err))
 		return
 	}
 
 	msg := fmt.Sprintf("Created job %v", req.Name)
-	ctx.JSON(http.StatusCreated, NewSuccessResponse(msg))
+	ctx.JSON(http.StatusCreated, proto.NewSuccessResponse(msg))
 }
 
 // @Summary Job Run Request
@@ -68,9 +68,9 @@ func HandleJobCreateRequest(ctx *gin.Context, srv *service.Service) {
 // @Accept json
 // @Produce json
 // @Param job body RunJobRequest true "Job execution, notification and logging configuration"
-// @Success 200 {object} BaseResponse
-// @Failure 404 {object} BaseResponse "Job Not Found with given name"
-// @Failure 501 {object} BaseResponse "Generic Internal Server Error"
+// @Success 202 {object} proto.RunJobResponse "Job execution accepted and queued"
+// @Failure 404 {object} proto.BaseResponse "Job Not Found with given name"
+// @Failure 501 {object} proto.BaseResponse "Generic Internal Server Error"
 // @Router /v1/jobs/:name/run [post]
 func HandleRunJobRequest(ctx *gin.Context, srv *service.Service) {
 	// Take the job name from the api parameters
@@ -78,19 +78,21 @@ func HandleRunJobRequest(ctx *gin.Context, srv *service.Service) {
 	log.Printf("[NEW REQUEST] Received new job running request for: %s\n", job_name)
 
 	// Bind the JSON payload from the request to the struct
-	req := requests.RunJobRequest{Name: job_name}
+	req := proto.RunJobRequest{Name: job_name}
 	if err := utils.MustBindWithJSON(&req, ctx.Request); err != nil {
-		ctx.JSON(http.StatusBadRequest, NewErrorResponseFromErrs(err))
+		ctx.JSON(http.StatusBadRequest, proto.NewErrorResponseFromErrs(err))
 		return
 	}
 
 	// Request the service to enqueue the job to run
-	_, err := srv.RunJob(ctx.Request.Context(), &req, nil)
+	run, err := srv.RunJob(ctx.Request.Context(), &req, nil)
 	if err != nil {
-		status_code := GetCodeFromError(err)
-		ctx.JSON(status_code, NewErrorResponseFromErrs(err))
+		status_code := proto.GetCodeFromError(err)
+		ctx.JSON(status_code, proto.NewErrorResponseFromErrs(err))
 		return
 	}
+
+	ctx.JSON(http.StatusAccepted, proto.NewRunJobResponse(run))
 }
 
 // RegisterHandlers registers v1 handlers

@@ -5,10 +5,11 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
-	"time"
 
-	apirequests "github.com/lmriccardo/backer/deamon/internal/api/v1/requests"
+	apirequests "github.com/lmriccardo/backer/deamon/internal/api/v1/proto"
+	"github.com/lmriccardo/backer/deamon/internal/core/core_utils"
 	"github.com/lmriccardo/backer/deamon/internal/core/domain"
+	"github.com/lmriccardo/backer/deamon/internal/core/errors"
 	"github.com/lmriccardo/backer/deamon/internal/db"
 	"github.com/lmriccardo/backer/deamon/internal/platform/utils"
 	_ "modernc.org/sqlite"
@@ -22,6 +23,8 @@ const (
 	ListJobsWithStatus
 	SearchJobByName
 	InsertNewJob
+	InsertNewRun
+	AlterRun
 )
 
 var REGISTRY_STATEMENTS = map[RegistryStatementType]string{
@@ -29,6 +32,8 @@ var REGISTRY_STATEMENTS = map[RegistryStatementType]string{
 	ListJobsWithStatus: `SELECT id, name, enabled, config_json FROM jobs WHERE enabled = ?`,
 	SearchJobByName:    `SELECT EXISTS ( SELECT 1 FROM jobs WHERE name = ? )`,
 	InsertNewJob:       `INSERT INTO jobs(name, enabled, config_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
+	InsertNewRun:       `INSERT INTO runs(id, job_id, started_at, one_shot, status, log_path) VALUES (?, ?, ?, ?, ?, ?)`,
+	AlterRun:           `UPDATE runs SET finished_at = ?, status = ?, exit_code = ?, error = ? WHERE id = ?`,
 }
 
 const NOF_WORKERS_DEFAULT = 4
@@ -50,12 +55,11 @@ type IRegistry interface {
 type Registry struct {
 	*TickeringRoaster
 
-	db         *sql.DB                   // The registry database
-	path       string                    // The path to the file database
-	ctx        context.Context           // Interrupt context
-	statements StatementsMap             // Map of prepared statements
-	runCh      <-chan *domain.JobRun     // Channel for reading job runs
-	pendRuns   map[string]*domain.JobRun // Maps with one shot pending runs (not stored into the roaster)
+	db         *sql.DB               // The registry database
+	path       string                // The path to the file database
+	ctx        context.Context       // Interrupt context
+	statements StatementsMap         // Map of prepared statements
+	runCh      <-chan *domain.JobRun // Channel for reading job runs
 }
 
 func NewRegistry(ctx context.Context, nWorkers int) (*Registry, error) {
@@ -178,11 +182,48 @@ func (r *Registry) handleCompletedRuns() {
 				return
 			}
 
-			log.Printf("Completed run with Id %s", run.Id)
+			switch run.Status {
+			case domain.RunStatusRunning:
+				// Add the current run into the pending runs
+				log.Printf("Running run with Id %s", run.Id)
+				r.PushPending(run)
+			case domain.RunStatusCompleted:
+				// Remove the run from the pending ones
+				log.Printf("Completed run with Id %s", run.Id)
+				if err := r.RemovePending(run.Id); err != nil {
+					log.Printf("Error: %s", err.Error())
+					continue
+				}
+			}
 
 			// Save the run into the database
+			if err := r.pushRunIntoDb(run); err != nil {
+				log.Printf("(Database Execution Error): %v", err.Error())
+			}
 		}
 	}
+}
+
+func (r *Registry) pushRunIntoDb(run *domain.JobRun) error {
+	var err error = nil
+	timestamp := utils.GetCurrTime()
+
+	switch run.Status {
+	case domain.RunStatusRunning:
+		// If the status is running, we need to initialize the database
+		// entry with a new run with some informations
+		stmt := r.bindStatementToTx(r.ctx, nil, InsertNewRun)
+		_, err = stmt.ExecContext(r.ctx, run.Id, run.Job.Name, timestamp, run.OneShot,
+			run.Status.String(), run.Job.Config.Log.Path,
+		)
+
+	case domain.RunStatusCompleted:
+		// When the job has completed, we alter the existing entry
+		stmt := r.bindStatementToTx(r.ctx, nil, AlterRun)
+		_, err = stmt.ExecContext(r.ctx, timestamp, run.Status.String(), 0, nil, run.Id)
+	}
+
+	return err
 }
 
 // WithTx provides a transaction wrapper. Every operation perform by the input
@@ -252,7 +293,7 @@ func (r *Registry) SearchJobByName(ctx context.Context, name string, tx *sql.Tx)
 
 	current_error := (error)(nil)
 	if !exists {
-		current_error = NewInvalidJobNameError(name)
+		current_error = errors.NewInvalidJobNameError(name)
 	}
 	return exists, current_error
 }
@@ -266,7 +307,7 @@ func (r *Registry) CreateJob(ctx context.Context, job *apirequests.CreateJobRequ
 	// 1. Before starting validating the input job, we should check that
 	// there not exists another job with the same name. Job names are unique.
 	result, err := r.SearchJobByName(ctx, job.Name, nil)
-	_, ok := err.(*InvalidJobNameError)
+	_, ok := err.(*errors.InvalidJobNameError)
 	if err != nil && !ok {
 		log.Printf("(SearchJobByName Error): %v", err.Error())
 		return err
@@ -275,28 +316,27 @@ func (r *Registry) CreateJob(ctx context.Context, job *apirequests.CreateJobRequ
 	// If the job exists returns a new error
 	if result {
 		log.Printf("(Error): Job %v already registered", job.Name)
-		return NewDuplicateJobNameError(job.Name)
+		return errors.NewDuplicateJobNameError(job.Name)
 	}
 
 	// 2. Create the job structure from the request
-	registry_job, err := createJob(job)
+	registry_job, err := core_utils.CreateJob(job)
 	if err != nil {
 		log.Printf("(Error) when creating Job: %v", err.Error())
 		return err
 	}
 
-	now := time.Now().UTC()
-	formatted := now.Format("2006-01-02 15:04:05")
+	time_formatted := utils.GetCurrTime()
 
 	// 3. Inser the job into the table
 	stmt := r.bindStatementToTx(ctx, tx, InsertNewJob)
 	config := utils.JSONToString(&registry_job.Config)
 	_, err = stmt.ExecContext(ctx, registry_job.Name, registry_job.Status,
-		config, formatted, formatted)
+		config, time_formatted, time_formatted)
 
 	if err != nil {
 		log.Printf("(Database Execution Error): %v", err.Error())
-		return NewDatabaseError(
+		return errors.NewDatabaseError(
 			fmt.Sprintf("unable to insert new job %v", job.Name),
 		)
 	}
@@ -311,18 +351,16 @@ func (r *Registry) CreateJob(ctx context.Context, job *apirequests.CreateJobRequ
 
 func (r *Registry) RunJob(ctx context.Context, req *apirequests.RunJobRequest, tx *sql.Tx) (*domain.Run, error) {
 	// First we need to check that the job actually exists
-	_, ok := r.GetTaskIndex(req.Name)
+	job, ok := r.GetTask(req.Name)
 	if !ok {
-		return nil, NewInvalidJobNameError(req.Name)
+		return nil, errors.NewInvalidJobNameError(req.Name)
 	}
 
-	// If the job exists than we can create the run task and push into the channel
-	job, _ := r.GetTask(req.Name)
-	job.Name = fmt.Sprintf("%s_ONESHOT", job.Name)
+	// If the job exists than we can create the run task and push into the channel.
 	task := r.CreateJobRunTask(job, req.DryRun, true)
 	r.ready <- task
 
-	return nil, nil
+	return &task.Run, nil
 }
 
 func (r *Registry) Close() {

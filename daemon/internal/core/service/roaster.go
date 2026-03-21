@@ -31,7 +31,7 @@ func (i *idProvider) getId(name string) string {
 	}
 
 	i.ids[name]++
-	return fmt.Sprintf("%s%s_%d", i.prefix, name, curr_id)
+	return fmt.Sprintf("%s%s_%04d", i.prefix, name, curr_id)
 }
 
 type RoasterTask struct {
@@ -42,12 +42,14 @@ type RoasterTask struct {
 }
 
 type TickeringRoaster struct {
-	tasks       []*RoasterTask      // The actual task list
-	ready       chan *domain.JobRun // Indexes of free tasks
-	taskToIndex map[string]int      // Maps tasks name to index
-	mu          sync.RWMutex        // The mutex for concurrency
-	ctx         context.Context     // The stopping context
-	idP         *idProvider         // Provides id generation for runs
+	tasks       []*RoasterTask            // The actual task list
+	ready       chan *domain.JobRun       // Indexes of free tasks
+	taskToIndex map[string]int            // Maps tasks name to index
+	mu          sync.RWMutex              // The mutex for concurrency
+	ctx         context.Context           // The stopping context
+	idP         *idProvider               // Provides id generation for runs
+	pending     map[string]*domain.JobRun // Pending runs
+	numericId   int                       // Incremental numeric ID assigned once pending
 }
 
 func NewTickeringRoaster(ctx context.Context, nWorkers int) *TickeringRoaster {
@@ -58,6 +60,8 @@ func NewTickeringRoaster(ctx context.Context, nWorkers int) *TickeringRoaster {
 		taskToIndex: map[string]int{},
 		ctx:         ctx,
 		idP:         idP,
+		pending:     map[string]*domain.JobRun{},
+		numericId:   0,
 	}
 
 	return roaster
@@ -66,11 +70,19 @@ func NewTickeringRoaster(ctx context.Context, nWorkers int) *TickeringRoaster {
 func (a *TickeringRoaster) CreateJobRunTask(
 	job *domain.Job, dryRun bool, oneShot bool,
 ) *domain.JobRun {
+
+	// If the job has the one shot flag, we can change its name
+	// by adding a tag but without overwriting the real job name
+	job_name := job.Name
+	if oneShot {
+		job_name = fmt.Sprintf("%s_ONESHOT", job_name)
+	}
+
 	return &domain.JobRun{
 		Job: job,
 		Run: domain.Run{
-			JobName: job.Name,
-			Id:      a.idP.getId(job.Name),
+			JobName: job_name,
+			Id:      a.idP.getId(job_name),
 			DryRun:  dryRun,
 			Status:  domain.RunStatusWaiting,
 			OneShot: oneShot,
@@ -87,6 +99,10 @@ func (a *TickeringRoaster) tickTask(t *RoasterTask) {
 			// First we also need to increment its run counter
 			t.task.Id = a.idP.getId(t.task.JobName)
 			a.ready <- t.task
+
+			// Once the ticker has ticker, we need to reset its duration
+			// to the next time the tick shall happens
+			t.ticker.Reset(t.task.Job.Duration())
 		case <-a.ctx.Done():
 			return
 		case <-t.ctx.Done():
@@ -184,6 +200,27 @@ func (a *TickeringRoaster) GetTask(name string) (*domain.Job, bool) {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 	return a.tasks[taskIndex].task.Job, true
+}
+
+func (a *TickeringRoaster) PushPending(run *domain.JobRun) {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	run.NumericId = a.numericId + 1
+	a.numericId++
+	a.pending[run.Id] = run
+}
+
+func (a *TickeringRoaster) RemovePending(run_id string) error {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+
+	if _, ok := a.pending[run_id]; !ok {
+		return fmt.Errorf("No pending run with ID: %s", run_id)
+	}
+
+	delete(a.pending, run_id)
+
+	return nil
 }
 
 // Close closes the ready channel for pushing task to runners

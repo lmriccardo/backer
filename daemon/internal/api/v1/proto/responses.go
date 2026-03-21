@@ -1,9 +1,9 @@
-package v1
+package proto
 
 import (
 	"net/http"
 
-	"github.com/lmriccardo/backer/deamon/internal/core/service"
+	"github.com/lmriccardo/backer/deamon/internal/core/errors"
 	"github.com/lmriccardo/backer/deamon/internal/platform/utils"
 )
 
@@ -41,13 +41,13 @@ func NewSuccessResponse(msg string) BaseResponse {
 // status bad request is used.
 func GetCodeFromError(err error) int {
 	switch err.(type) {
-	case *service.DuplicateJobNameError:
+	case *errors.DuplicateJobNameError:
 		return http.StatusConflict
-	case *service.InvalidJobNameError:
+	case *errors.InvalidJobNameError:
 		return http.StatusNotFound
-	case *service.ConfigurationError:
+	case *errors.ConfigurationError:
 		return http.StatusBadRequest
-	case *service.DatabaseError:
+	case *errors.DatabaseError:
 		return http.StatusInternalServerError
 	default:
 		return http.StatusBadRequest

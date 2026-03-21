@@ -182,11 +182,12 @@ func (r RunStatus) String() string {
 }
 
 type Run struct {
-	Id      string    // The Id of the run
-	Status  RunStatus // Current status of the run
-	JobName string    // Name of the job of the current run
-	DryRun  bool      // If the run is a dry-run
-	OneShot bool      // If this run is one shot or not
+	Id        string    // The Id of the run
+	NumericId int       // Numeric ID of the run
+	Status    RunStatus // Current status of the run
+	JobName   string    // Name of the job of the current run
+	DryRun    bool      // If the run is a dry-run
+	OneShot   bool      // If this run is one shot or not
 }
 
 type JobRun struct {

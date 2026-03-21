@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"sync"
+	"time"
 
 	"github.com/lmriccardo/backer/deamon/internal/core/domain"
 )
@@ -24,6 +25,7 @@ func NewBackerRunner(
 
 func (b *BackerRunner) exec(job *domain.Job) {
 	log.Printf("Running job: %s\n", job.Name)
+	time.Sleep(1 * time.Second)
 }
 
 func (b *BackerRunner) Run() {
@@ -39,8 +41,12 @@ func (b *BackerRunner) Run() {
 				return
 			}
 
-			// Set its status to running and execute the task
+			// Set its status to running and communicate to the registry
+			// that the job is running
 			job.Status = domain.RunStatusRunning
+			b.rch <- job
+
+			// Execute the task
 			b.exec(job.Job)
 
 			// Set its status to completed and push it back into the

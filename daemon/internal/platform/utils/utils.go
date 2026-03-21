@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"time"
 )
 
 type WithDefault interface {
@@ -188,4 +189,11 @@ func GetDomainFromEmail(email string) string {
 func JSONToString[T any](in *T) string {
 	data, _ := json.Marshal(in)
 	return string(data)
+}
+
+// GetCurrTime returns the current time in "2026-03-21 12:55:00" format
+func GetCurrTime() string {
+	now := time.Now().UTC()
+	formatted := now.Format("2006-01-02 15:04:05")
+	return formatted
 }

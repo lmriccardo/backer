@@ -1,4 +1,4 @@
-package service
+package core_utils
 
 import (
 	"fmt"
@@ -7,8 +7,9 @@ import (
 	"regexp"
 	"strconv"
 
-	apirequests "github.com/lmriccardo/backer/deamon/internal/api/v1/requests"
+	apirequests "github.com/lmriccardo/backer/deamon/internal/api/v1/proto"
 	"github.com/lmriccardo/backer/deamon/internal/core/domain"
+	"github.com/lmriccardo/backer/deamon/internal/core/errors"
 	"github.com/lmriccardo/backer/deamon/internal/platform/constants"
 	"github.com/lmriccardo/backer/deamon/internal/platform/utils"
 )
@@ -19,7 +20,7 @@ func fillSmtpServer(dst *domain.EmailNotification, smtp *apirequests.SMTPConfig)
 	domain_name := utils.GetDomainFromEmail(dst.From)
 	smtp_provider, ok := constants.SMTP_PROVIDERS[domain_name]
 	if !ok && smtp == nil {
-		return NewConfigurationError(
+		return errors.NewConfigurationError(
 			"EmailNotification",
 			"uknown smtp provider and SMTP configuration is not set",
 		)
@@ -45,7 +46,7 @@ func fillSmtpServer(dst *domain.EmailNotification, smtp *apirequests.SMTPConfig)
 func timeoutStrToFloat(timeout string) (float64, error) {
 	matches := TIMEOUT_RE.FindStringSubmatch(timeout)
 	if matches == nil {
-		return -1, NewConfigurationError(
+		return -1, errors.NewConfigurationError(
 			"WebhookNotification:Timeout",
 			fmt.Sprintf("invalid timeout string: %v", timeout),
 		)
@@ -138,7 +139,7 @@ func createRsyncCommand(job *apirequests.CreateJobRequest) []string {
 	return command
 }
 
-func createJob(job *apirequests.CreateJobRequest) (*domain.Job, error) {
+func CreateJob(job *apirequests.CreateJobRequest) (*domain.Job, error) {
 	job_config := domain.JobConfig{Name: job.Name}
 
 	// 1. Configure log setting
